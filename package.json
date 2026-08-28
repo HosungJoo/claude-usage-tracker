@@ -16,7 +16,8 @@
     "demo": "electron-vite dev -- --demo",
     "build": "electron-vite build",
     "start": "electron-vite preview",
-    "sprites": "tsx tools/preview-sprites.ts sprite-preview.png 6"
+    "sprites": "tsx tools/preview-sprites.ts sprite-preview.png 6",
+    "check:transparency": "electron tools/check-transparency.cjs --no-sandbox"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
