@@ -25,10 +25,20 @@ const WINDOW_LABEL: Record<WindowKey, string> = {
   weekly: '주간',
 };
 
-/** 임계값별 표정. 50%는 가볍게, 100%는 다급하게. */
+/**
+ * 임계값별 표정.
+ *
+ * 단계마다 새로운 신호가 하나씩 더해지도록 짰다 — 표정만 바뀌면 무엇이
+ * 달라졌는지 알아채기 어렵다.
+ *
+ *   50%  talk   평소처럼 말한다
+ *   70%  worry  눈이 처지고 식은땀이 흐른다
+ *   90%  alert  머리 위에 느낌표가 뜨고 눈이 커진다
+ *   100% faint  눈이 ×가 되고 주저앉는다
+ */
 function expressionForThreshold(threshold: number, severity: Severity): Expression {
-  if (threshold >= 100) return 'panic';
-  if (threshold >= 90) return 'panic';
+  if (threshold >= 100) return 'faint';
+  if (threshold >= 90) return 'alert';
   if (threshold >= 70) return 'worry';
   return severity === 'normal' ? 'talk' : 'worry';
 }
@@ -77,8 +87,9 @@ export function lineForGreeting(snapshot: UsageSnapshot, now: number = Date.now(
   const week = snapshot.weekly;
   const remainFive = Math.max(0, 100 - five.percent);
 
+  // 이미 위험한 상태에서 세션을 열면 인사보다 경고가 먼저다.
   const expression: Expression =
-    snapshot.severity === 'critical' ? 'worry' : snapshot.severity === 'warning' ? 'talk' : 'wave';
+    snapshot.severity === 'critical' ? 'panic' : snapshot.severity === 'warning' ? 'worry' : 'wave';
 
   const title =
     snapshot.severity === 'critical'

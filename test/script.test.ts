@@ -27,13 +27,20 @@ function event(threshold: number, severity: Severity = 'normal'): ThresholdEvent
 }
 
 describe('lineForThreshold', () => {
+  // 단계마다 새로운 신호가 하나씩 더해진다 — 표정만 바뀌면 무엇이
+  // 달라졌는지 알아채기 어렵다.
   it.each([
     [50, 'talk'],
     [70, 'worry'],
-    [90, 'panic'],
-    [100, 'panic'],
+    [90, 'alert'],
+    [100, 'faint'],
   ])('%i%%에서는 %s 표정', (threshold, expression) => {
     expect(lineForThreshold(event(threshold), NOW).expression).toBe(expression);
+  });
+
+  it('단계마다 표정이 모두 다르다', () => {
+    const seen = [50, 70, 90, 100].map((t) => lineForThreshold(event(t), NOW).expression);
+    expect(new Set(seen).size).toBe(seen.length);
   });
 
   it('임계값이 높을수록 오래 띄운다', () => {
@@ -68,10 +75,14 @@ describe('lineForGreeting', () => {
     expect(lineForGreeting(snap(12, 8), NOW).expression).toBe('wave');
   });
 
-  it('위험할 때는 아껴 쓰자고 한다', () => {
+  it('위험할 때는 인사보다 경고가 먼저다', () => {
     const line = lineForGreeting(snap(95, 80, 'critical'), NOW);
-    expect(line.expression).toBe('worry');
+    expect(line.expression).toBe('panic');
     expect(line.title).toContain('아껴');
+  });
+
+  it('주의 단계에서는 손을 흔들지 않는다', () => {
+    expect(lineForGreeting(snap(75, 40, 'warning'), NOW).expression).toBe('worry');
   });
 
   it('남은 비율을 알려준다', () => {
