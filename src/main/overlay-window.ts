@@ -34,9 +34,9 @@ export interface OverlayPlacement {
   margin: number;
   /**
    * 어느 디스플레이에 띄울지.
-   * 'cursor' — 마우스가 있는 화면 (기본).
-   * 'primary' — 주 디스플레이.
-   * number — Electron display id.
+   *
+   * 여러 화면에 동시에 띄우는 것은 상위(OverlayHost)가 화면마다 배치를
+   * 만들어 넘기는 방식으로 처리한다. 여기서는 한 화면만 다룬다.
    */
   display: 'cursor' | 'primary' | number;
 }

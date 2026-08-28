@@ -1,4 +1,4 @@
-import { app, screen, shell, type BrowserWindow } from 'electron';
+import { app, screen, shell } from 'electron';
 import { join } from 'node:path';
 import { UsagePoller } from '../core/poller.js';
 import { normalizeUsage } from '../core/usage-api.js';
@@ -10,6 +10,7 @@ import {
   lineForThreshold,
   type Line,
 } from '../shared/character/script.js';
+import { computeBounds as computeBoundsFor } from './overlay-window.js';
 import { EventSpool } from './event-spool.js';
 import { Logger, logDir } from './logger.js';
 import { OverlayController } from './overlay-controller.js';
@@ -19,12 +20,8 @@ import { openSettings, settingsRendererTarget } from './settings-window.js';
 import { UsageTray } from './tray.js';
 import { applyAutostart } from './autostart.js';
 import { findWorkingWindow } from './window-anchor.js';
-import {
-  createOverlayWindow,
-  overlaySizeFor,
-  repositionOverlay,
-  type OverlayPlacement,
-} from './overlay-window.js';
+import { overlaySizeFor, type OverlayPlacement } from './overlay-window.js';
+import { resolveTargets, WindowOverlayHost } from './overlay-host.js';
 import type { Severity, UsageResponse, UsageSnapshot } from '../core/types.js';
 import type { Settings } from '../shared/settings.js';
 
@@ -35,7 +32,7 @@ import type { Settings } from '../shared/settings.js';
  * 설정 변경을 흘려보내는 일만 맡는다.
  */
 
-let overlayWin: BrowserWindow | null = null;
+let host: WindowOverlayHost | null = null;
 let controller: OverlayController | null = null;
 let poller: UsagePoller | null = null;
 let spool: EventSpool | null = null;
@@ -53,16 +50,49 @@ let subscription: string | null = null;
 const DEMO = process.argv.includes('--demo');
 const CAPTURE = process.argv.find((a) => a.startsWith('--capture='))?.slice('--capture='.length);
 
-function placement(anchorRect?: OverlayPlacement['anchorRect']): OverlayPlacement {
+/**
+ * 한 화면에 대한 배치.
+ *
+ * 여러 화면에 띄울 때는 화면마다 이 함수를 불러 각자의 배치를 만든다.
+ */
+function placementFor(
+  displayId: number,
+  anchorRect?: OverlayPlacement['anchorRect'],
+): OverlayPlacement {
   const s = store.value;
   return {
     corner: s.corner,
     margin: s.margin,
-    display: s.display,
+    display: displayId,
     size: overlaySizeFor(s.anchor),
     center: s.anchor === 'center',
     ...(anchorRect ? { anchorRect } : {}),
   };
+}
+
+/** 작업 중인 창을 찾았으면 그 사각형. 없으면 undefined. */
+let anchorRect: OverlayPlacement['anchorRect'];
+
+/**
+ * 이번에 띄울 화면들과 각자의 배치.
+ *
+ * 창 기준 모드에서 창을 찾았다면 그 창이 있는 화면 하나만 쓴다 — 창을
+ * 찾았다는 것은 어디를 보고 있는지 안다는 뜻이므로, 나머지 화면까지
+ * 띄울 이유가 없다.
+ */
+function overlayTargets(): Array<{ display: Electron.Display; placement: OverlayPlacement }> {
+  if (anchorRect) {
+    const center = {
+      x: Math.round(anchorRect.x + anchorRect.width / 2),
+      y: Math.round(anchorRect.y + anchorRect.height / 2),
+    };
+    const d = screen.getDisplayNearestPoint(center);
+    return [{ display: d, placement: placementFor(d.id, anchorRect) }];
+  }
+  return resolveTargets(store.value.display).map((d) => ({
+    display: d,
+    placement: placementFor(d.id),
+  }));
 }
 
 /**
@@ -70,31 +100,30 @@ function placement(anchorRect?: OverlayPlacement['anchorRect']): OverlayPlacemen
  *
  * '작업 중인 창' 모드에서는 매번 창 위치를 다시 본다 — 사용자가 창을
  * 옮기거나 다른 창으로 넘어가면 캐릭터도 따라가야 의미가 있다.
- * 창을 찾지 못하면 화면 모서리로 물러난다.
+ * 창을 찾지 못하면 화면 기준으로 물러난다.
  */
 async function applyPlacement(cwd: string | null = null): Promise<void> {
-  if (!overlayWin || overlayWin.isDestroyed()) return;
+  anchorRect = undefined;
 
-  let anchorRect: OverlayPlacement['anchorRect'];
   if (store.value.anchor === 'window') {
     const found = await findWorkingWindow(cwd);
     if (found) {
       anchorRect = { x: found.x, y: found.y, width: found.width, height: found.height };
     } else {
-      logger.info('작업 중인 창을 찾지 못해 화면 모서리에 띄웁니다.');
+      logger.info('작업 중인 창을 찾지 못해 화면 기준으로 띄웁니다.');
     }
   }
-  repositionOverlay(overlayWin, placement(anchorRect));
 
-  const b = overlayWin.getBounds();
-  const s = store.value;
+  const targets = overlayTargets();
   const where =
-    s.anchor === 'center'
-      ? '화면 한가운데'
-      : anchorRect
-        ? `창 기준 ${s.corner}`
-        : `화면 기준 ${s.corner}`;
-  logger.info(`배치 — ${where} → (${b.x}, ${b.y}) ${b.width}×${b.height}`);
+    store.value.anchor === 'center' ? '한가운데' : anchorRect ? '창 모서리' : '화면 모서리';
+  const at = targets
+    .map((t) => {
+      const b = computeBoundsFor(t.placement);
+      return `(${b.x}, ${b.y})`;
+    })
+    .join(' ');
+  logger.info(`배치 — ${where} · 화면 ${targets.length}개 → ${at}`);
 }
 
 /** 캐릭터를 띄운다. 설정에서 껐으면 아무 일도 하지 않는다. */
@@ -127,25 +156,15 @@ function rendererTarget(): { rendererUrl?: string; rendererFile?: string } {
 }
 
 function createOverlay(): void {
-  overlayWin = createOverlayWindow({
+  host = new WindowOverlayHost({
     preloadPath: join(__dirname, '../preload/index.cjs'),
-    placement: placement(),
+    targets: overlayTargets,
     ...rendererTarget(),
   });
+  // 알림이 왔을 때 로딩을 기다리지 않도록 미리 만들어 둔다.
+  host.warmUp();
 
-  if (CAPTURE) {
-    overlayWin.webContents.on('console-message', (_e, level, message) => {
-      console.log(`[renderer:${level}] ${message}`);
-    });
-  }
-
-  controller = new OverlayController(overlayWin, holdPolicy(), (m) => logger.info(m));
-
-  overlayWin.on('closed', () => {
-    controller?.dispose();
-    controller = null;
-    overlayWin = null;
-  });
+  controller = new OverlayController(host, holdPolicy(), (m) => logger.info(m));
 }
 
 /** 설정에서 읽은 표시 종료 규칙. */
@@ -158,7 +177,8 @@ function holdPolicy(): { presentMs: number; waitWhenAway: boolean } {
 
 function watchDisplays(): void {
   const reposition = (): void => {
-    void applyPlacement();
+    // 모니터가 늘거나 줄면 창 구성도 따라가야 한다.
+    host?.warmUp();
   };
   screen.on('display-added', reposition);
   screen.on('display-removed', reposition);
@@ -218,7 +238,7 @@ function onSettingsChanged(next: Settings, prev: Settings): void {
     next.anchor !== prev.anchor ||
     next.display !== prev.display
   ) {
-    if (overlayWin) void applyPlacement();
+    host?.warmUp();
   }
 
   if (next.autostart !== prev.autostart) {
@@ -379,7 +399,8 @@ async function captureDemo(dir: string): Promise<void> {
   // capturePage는 투명 창을 통째로 투명하게 캡처한다. 배치와 색을 눈으로
   // 확인하려면 임시 배경이 필요하다 — 캡처 모드에서만 깔고, 실제 실행에는
   // 영향을 주지 않는다.
-  await overlayWin?.webContents.insertCSS('body { background: #1e1e1e !important; }');
+  const shot = host?.anyWindow() ?? null;
+  await shot?.webContents.insertCSS('body { background: #1e1e1e !important; }');
 
   for (const [i, scene] of demoScenes().entries()) {
     controller?.clear();
@@ -391,8 +412,8 @@ async function captureDemo(dir: string): Promise<void> {
     );
     await new Promise((r) => setTimeout(r, 1400));
 
-    if (!overlayWin || overlayWin.isDestroyed()) break;
-    const image = await overlayWin.webContents.capturePage();
+    if (!shot || shot.isDestroyed()) break;
+    const image = await shot.webContents.capturePage();
     await writeFile(join(dir, `${i}-${scene.name}.png`), image.toPNG());
     console.log(`captured ${i}-${scene.name}.png`);
   }
@@ -403,16 +424,17 @@ async function captureDemo(dir: string): Promise<void> {
 async function captureHookFlow(dir: string): Promise<void> {
   const { writeFile, mkdir } = await import('node:fs/promises');
   await mkdir(dir, { recursive: true });
-  await overlayWin?.webContents.insertCSS('body { background: #1e1e1e !important; }');
+  const shot = host?.anyWindow() ?? null;
+  await shot?.webContents.insertCSS('body { background: #1e1e1e !important; }');
   console.log(`hook-capture ready: ${spool?.directory ?? '(스풀 없음)'}`);
 
   for (let i = 0; i < 40; i++) {
     await new Promise((r) => setTimeout(r, 500));
-    if (!overlayWin || overlayWin.isDestroyed()) break;
-    if (!overlayWin.isVisible()) continue;
+    if (!shot || shot.isDestroyed()) break;
+    if (!shot.isVisible()) continue;
 
     await new Promise((r) => setTimeout(r, 900));
-    const image = await overlayWin.webContents.capturePage();
+    const image = await shot.webContents.capturePage();
     await writeFile(join(dir, 'hook-greeting.png'), image.toPNG());
     console.log('captured hook-greeting.png');
     break;
@@ -474,6 +496,7 @@ if (!app.requestSingleInstanceLock()) {
     logger.info('종료합니다.');
     poller?.stop();
     controller?.clear();
+    host?.destroy();
     tray?.destroy();
     // 스풀 디렉터리를 지워야 훅이 '앱이 없다'를 알아챈다.
     // before-quit은 프로미스를 기다리지 않으므로 동기로 지운다.

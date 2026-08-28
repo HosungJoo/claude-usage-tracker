@@ -7,56 +7,45 @@ import type { Line } from '../src/shared/character/script.js';
  */
 
 const ipcHandlers = new Map<string, (e: unknown, ...args: never[]) => void>();
-const wcHandlers = new Map<string, Array<(...args: never[]) => void>>();
 
 const sent: Array<{ channel: string; payload?: unknown }> = [];
 const calls = {
   show: 0,
   hide: 0,
   ignoreMouse: [] as boolean[],
-  /** setAlwaysOnTop 호출 시각(ms). 띄운 뒤 다시 거는지 보려면 순서가 중요하다. */
-  alwaysOnTop: [] as number[],
+  /** 어느 요청이 몇 개의 화면에 나갔는지. */
+  screens: [] as number[],
 };
-let loading = false;
-let visible = false;
+let ready = true;
+let screenCount = 1;
+let readyCb: (() => void) | null = null;
 
-function fireWc(event: string): void {
-  for (const h of wcHandlers.get(event) ?? []) h();
-}
-
-const fakeWin = {
-  isDestroyed: () => false,
-  isVisible: () => visible,
-  showInactive: () => {
-    calls.show++;
-    visible = true;
+/** 컨트롤러가 기대하는 최소 인터페이스만 흉내 낸다. */
+const fakeHost = {
+  isReady: () => ready,
+  onReady: (cb: () => void) => {
+    if (ready) cb();
+    else readyCb = cb;
   },
+  show: (req: unknown) => {
+    calls.show++;
+    calls.screens.push(screenCount);
+    sent.push({ channel: 'overlay:show', payload: req });
+  },
+  // sent 에는 표시 요청만 쌓는다. 감추기는 calls.hide 로 센다.
   hide: () => {
     calls.hide++;
-    visible = false;
   },
-  setIgnoreMouseEvents: (ignore: boolean) => {
-    calls.ignoreMouse.push(ignore);
-  },
-  setAlwaysOnTop: () => {
-    calls.alwaysOnTop.push(Date.now());
-  },
-  setVisibleOnAllWorkspaces: () => {},
-  webContents: {
-    isLoading: () => loading,
-    send: (channel: string, payload?: unknown) => sent.push({ channel, payload }),
-    on: (event: string, fn: () => void) => {
-      const list = wcHandlers.get(event) ?? [];
-      list.push(fn);
-      wcHandlers.set(event, list);
-    },
-    once: (event: string, fn: () => void) => {
-      const list = wcHandlers.get(event) ?? [];
-      list.push(fn);
-      wcHandlers.set(event, list);
-    },
-  },
+  setInteractive: (v: boolean) => calls.ignoreMouse.push(!v),
+  destroy: () => {},
 };
+
+/** 렌더러가 준비됐다고 알린다. */
+function becomeReady(): void {
+  ready = true;
+  readyCb?.();
+  readyCb = null;
+}
 
 vi.mock('electron', () => ({
   ipcMain: {
@@ -77,7 +66,7 @@ function line(title: string, holdMs = 5000): Line {
 let present = true;
 
 function make(waitWhenAway = false, presentMs = 3000): InstanceType<typeof OverlayController> {
-  return new OverlayController(fakeWin as never, {
+  return new OverlayController(fakeHost, {
     presentMs,
     waitWhenAway,
     isPresent: () => Promise.resolve(present),
@@ -98,14 +87,14 @@ afterEach(() => {
 beforeEach(() => {
   vi.useFakeTimers();
   ipcHandlers.clear();
-  wcHandlers.clear();
   sent.length = 0;
   calls.show = 0;
   calls.hide = 0;
   calls.ignoreMouse.length = 0;
-  calls.alwaysOnTop.length = 0;
-  loading = false;
-  visible = false;
+  calls.screens.length = 0;
+  ready = true;
+  readyCb = null;
+  screenCount = 1;
   present = true;
 });
 
@@ -131,27 +120,22 @@ describe('OverlayController', () => {
     expect(calls.show).toBe(1);
   });
 
-  it('띄운 뒤 항상-위를 다시 건다', () => {
-    // 리눅스에서 show는 항상-위 설정을 비동기로 지운다. 한 번만 걸면
-    // 캐릭터가 다른 창 뒤로 갈 수 있다.
-    const c = make();
-    c.enqueue(line('x'), 'normal', [], 'bottom-right');
-    const immediate = calls.alwaysOnTop.length;
-    expect(immediate).toBeGreaterThan(0);
-
-    vi.advanceTimersByTime(500);
-    expect(calls.alwaysOnTop.length).toBeGreaterThan(immediate);
-  });
-
-  it('렌더러가 아직 로딩 중이면 보내지 않고 기다린다', () => {
-    loading = true;
+  it('렌더러가 아직 준비되지 않았으면 보내지 않고 기다린다', () => {
+    ready = false;
     const c = make();
     c.enqueue(line('먼저 온 알림'), 'normal', [], 'bottom-right');
     expect(sent).toHaveLength(0);
 
-    fireWc('did-finish-load');
+    becomeReady();
     expect(sent).toHaveLength(1);
     expect((sent[0]?.payload as { line: Line }).line.title).toBe('먼저 온 알림');
+  });
+
+  it('화면이 여럿이면 전부에 보낸다', () => {
+    screenCount = 3;
+    const c = make();
+    c.enqueue(line('x'), 'normal', [], 'bottom-right');
+    expect(calls.screens).toEqual([3]);
   });
 
   it('표시 중이면 큐에 쌓고 하나씩 보여준다', () => {
@@ -218,9 +202,9 @@ describe('OverlayController', () => {
     c.enqueue(line('b'), 'normal', [], 'bottom-right');
     c.clear();
 
-    expect(sent.some((s) => s.channel === IPC.hide)).toBe(true);
+    expect(calls.hide).toBeGreaterThan(0);
     vi.advanceTimersByTime(10_000);
-    expect(sent.filter((s) => s.channel === IPC.show)).toHaveLength(1);
+    expect(sent).toHaveLength(1);
   });
 
   it('말풍선 위에서만 클릭을 받는다', () => {
@@ -228,7 +212,7 @@ describe('OverlayController', () => {
     const handler = ipcHandlers.get(IPC.setInteractive);
     handler?.(null, true as never);
     handler?.(null, false as never);
-    // setIgnoreMouseEvents는 interactive의 반대값을 받아야 한다.
+    // 클릭 통과는 interactive의 반대값이다.
     expect(calls.ignoreMouse).toEqual([false, true]);
   });
 

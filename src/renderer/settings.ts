@@ -81,10 +81,13 @@ function render(settings: Settings): void {
   els.intervalOut.textContent = formatSeconds(settings.pollIntervalSec);
   els.character.checked = settings.characterEnabled;
   els.display.value = String(settings.display);
+  const displayHints: Record<string, string> = {
+    all: '어느 화면을 보고 계신지 알 수 없으므로 전부에 띄웁니다. 화면이 하나면 차이가 없습니다.',
+    primary: '항상 주 모니터에만 뜹니다.',
+    cursor: 'Wayland에서는 마우스 위치를 알 수 없어 엉뚱한 화면에 뜰 수 있습니다.',
+  };
   els.displayHint.textContent =
-    settings.display === 'cursor'
-      ? 'Wayland에서는 마우스 위치를 알 수 없어 엉뚱한 화면에 뜰 수 있습니다.'
-      : '항상 같은 화면에 뜹니다.';
+    displayHints[String(settings.display)] ?? '지정한 모니터에만 뜹니다.';
   els.anchor.value = settings.anchor;
   els.anchorHint.textContent =
     settings.anchor === 'window'
@@ -119,6 +122,7 @@ function renderDisplays(status: Awaited<ReturnType<typeof window.settings.status
   els.display.replaceChildren();
 
   const fixed: Array<[string, string]> = [
+    ['all', '모든 모니터'],
     ['primary', '주 모니터'],
     ['cursor', '커서가 있는 화면'],
   ];
@@ -192,7 +196,8 @@ els.character.addEventListener('change', () =>
 );
 els.display.addEventListener('change', () => {
   const v = els.display.value;
-  void save({ display: v === 'cursor' || v === 'primary' ? v : Number(v) });
+  const fixed = v === 'all' || v === 'cursor' || v === 'primary';
+  void save({ display: fixed ? v : Number(v) });
 });
 els.anchor.addEventListener('change', () =>
   void save({ anchor: els.anchor.value as Settings['anchor'] }),

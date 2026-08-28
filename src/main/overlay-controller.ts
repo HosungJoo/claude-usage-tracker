@@ -1,6 +1,6 @@
-import type { BrowserWindow } from 'electron';
 import { ipcMain } from 'electron';
-import { cancelReassert, showOverlay, type OverlaySize } from './overlay-window.js';
+import type { OverlaySize } from './overlay-window.js';
+import type { OverlayHost } from './overlay-host.js';
 import { isUserPresent } from './presence.js';
 import type { Line } from '../shared/character/script.js';
 import { IPC, type GaugeInfo, type ShowRequest } from '../shared/ipc.js';
@@ -67,7 +67,7 @@ export class OverlayController {
   private rendererReady = false;
 
   constructor(
-    private readonly win: BrowserWindow,
+    private readonly host: OverlayHost,
     /** 표시 종료 규칙. 설정이 바뀌면 갱신한다. */
     private policy: HoldPolicy = { presentMs: 3000, waitWhenAway: true },
     /**
@@ -82,16 +82,7 @@ export class OverlayController {
     ipcMain.on(IPC.setInteractive, this.handleSetInteractive);
     ipcMain.on(IPC.dismissed, this.handleDismissed);
 
-    if (win.webContents.isLoading()) {
-      win.webContents.once('did-finish-load', () => this.markReady());
-    } else {
-      this.markReady();
-    }
-    // 새로고침되면 렌더러 상태가 초기화되므로 표시 중인 것도 버린다.
-    win.webContents.on('did-start-loading', () => {
-      this.rendererReady = false;
-    });
-    win.webContents.on('did-finish-load', () => this.markReady());
+    host.onReady(() => this.markReady());
   }
 
   private markReady(): void {
@@ -101,17 +92,14 @@ export class OverlayController {
   }
 
   private handleSetInteractive = (_e: unknown, interactive: boolean): void => {
-    if (this.win.isDestroyed()) return;
-    // forward:true 를 유지해야 통과시키는 동안에도 hover 이벤트가 렌더러에 간다.
-    this.win.setIgnoreMouseEvents(!interactive, { forward: true });
+    this.host.setInteractive(interactive);
   };
 
   private handleDismissed = (_e: unknown, id: number): void => {
     if (this.showing?.id !== id) return;
     this.showing = null;
     this.clearHoldTimers();
-    cancelReassert(this.win);
-    this.win.hide();
+    this.host.hide();
     this.scheduleNext();
   };
 
@@ -161,11 +149,7 @@ export class OverlayController {
       clearTimeout(this.gapTimer);
       this.gapTimer = null;
     }
-    if (!this.win.isDestroyed()) {
-      cancelReassert(this.win);
-      this.win.webContents.send(IPC.hide);
-      this.win.hide();
-    }
+    this.host.hide();
   }
 
   private scheduleNext(): void {
@@ -177,7 +161,7 @@ export class OverlayController {
   }
 
   private pump(): void {
-    if (this.disposed || this.showing || !this.rendererReady || this.win.isDestroyed()) return;
+    if (this.disposed || this.showing || !this.rendererReady) return;
     const next = this.queue.shift();
     if (!next) return;
 
@@ -192,9 +176,8 @@ export class OverlayController {
       centered: next.centered,
     };
 
-    // 포커스를 훔치지 않고 띄우되, 뜬 뒤에 항상-위를 다시 건다.
-    showOverlay(this.win);
-    this.win.webContents.send(IPC.show, req);
+    // 어느 화면을 보고 있는지 알 수 없으므로, 설정에 따라 여러 화면에 함께 띄운다.
+    this.host.show(req);
 
     this.shownAt = Date.now();
     this.log(`표시 #${next.id} — ${next.line.title}`);
