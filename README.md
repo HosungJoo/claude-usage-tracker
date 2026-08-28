@@ -7,16 +7,21 @@
 
 ## 현재 상태
 
-M1 (Usage Core) 진행 중 — 헤드리스 코어가 동작합니다. UI는 M2부터.
+M2 (Overlay & Character) 완료 — 캐릭터가 오버레이로 등장해 사용량을 보고합니다.
+세션 시작 연동은 M3, 트레이·설정은 M4.
 
 ## 사용법
 
 ```bash
 npm install
+
+npm run dev                # 앱 실행 (실제 사용량 폴링)
+npm run demo               # 임계값 50/70/90/100 연출을 8초 간격으로 재생
+
 npm run cli -- --once      # 현재 사용량 출력
 npm run cli -- --json      # JSON으로
 npm run cli -- --watch     # 폴링하며 임계값 이벤트 관찰
-npm run cli -- --help
+npm run sprites            # 캐릭터 스프라이트 시트를 PNG로 뽑아 눈으로 확인
 ```
 
 출력 예:
@@ -51,19 +56,56 @@ anthropic-beta: oauth-2025-04-20
 
 **토큰은 로그·에러 메시지 어디에도 남기지 않습니다.**
 
+## 캐릭터
+
+클로드의 방사형 심볼에서 가져온 픽셀 마스코트입니다. 이미지 파일이 아니라
+**코드로 그립니다** — 표정과 포즈가 매개변수라서, 프레임을 하나 더하는 데
+그림을 다시 그릴 필요가 없습니다.
+
+표정은 사용량 심각도에 붙습니다: `wave`(인사) · `happy`(여유) · `talk`(보고) ·
+`worry`(주의, 70%) · `panic`(위험, 90%+). 서버가 내려주는 `severity` 값을
+그대로 쓰므로 판정 규칙을 클라이언트에서 다시 만들지 않습니다.
+
+`npm run sprites` 로 전체 프레임을 시트로 뽑아 볼 수 있습니다.
+
 ## 구조
 
 ```
-src/core/
-  types.ts         API 응답 타입 + 내부 스냅샷 타입
-  credentials.ts   ~/.claude/.credentials.json 로더
-  usage-api.ts     API 호출 + 정규화
-  thresholds.ts    50/70/90/100% 발화 판정 (순수 함수)
-  state-store.ts   발화 이력 영속화 (원자적 쓰기)
-  poller.ts        주기 폴링 + 지수 백오프
-  format.ts        사람이 읽는 문자열
-src/cli/           헤드리스 검증 CLI
+src/core/                  헤드리스 코어 (UI 의존성 없음)
+  types.ts                 API 응답 타입 + 내부 스냅샷 타입
+  credentials.ts           ~/.claude/.credentials.json 로더
+  usage-api.ts             API 호출 + 정규화
+  thresholds.ts            50/70/90/100% 발화 판정 (순수 함수)
+  state-store.ts           발화 이력 영속화 (원자적 쓰기)
+  poller.ts                주기 폴링 + 지수 백오프
+  format.ts                사람이 읽는 문자열
+
+src/shared/
+  pixel/grid.ts            픽셀 그리기 프리미티브 (원·삼각형·광선·윤곽선)
+  pixel/png.ts             최소 PNG 인코더 (도구/아이콘용)
+  character/palette.ts     팔레트
+  character/sprites.ts     캐릭터를 코드로 그린다
+  character/animator.ts    프레임 재생 + 눈 깜박임
+  character/script.ts      표정과 대사
+  ipc.ts                   메인 ↔ 렌더러 계약
+
+src/main/                  Electron 메인
+  overlay-window.ts        투명·클릭통과·항상위 창 + 멀티모니터 배치
+  overlay-controller.ts    표시 큐 (겹침 방지, 심각도 우선순위)
+src/preload/               contextBridge
+src/renderer/              캔버스 캐릭터 + 말풍선
+src/cli/                   헤드리스 검증 CLI
+tools/                     스프라이트 미리보기
 ```
+
+## 오버레이가 지키는 것
+
+작업을 방해하지 않는 것이 이 앱의 전제입니다.
+
+- 기본적으로 **클릭을 통과**시킵니다. 말풍선 위에 마우스가 올라왔을 때만 받습니다.
+- **포커스를 훔치지 않습니다** (`showInactive` + `focusable: false`). 타이핑 중에 떠도 글자를 가로채지 않습니다.
+- 작업표시줄에 뜨지 않고, 전체화면 앱 위에도 표시됩니다.
+- 알림이 몰려도 **하나씩** 나옵니다. 더 심각한 소식이 먼저 나옵니다.
 
 ## 개발
 

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'" />
+    <title>Claude Usage Tracker</title>
+    <link rel="stylesheet" href="./overlay.css" />
+  </head>
+  <body>
+    <div id="stage" class="stage" aria-hidden="true">
+      <div id="bubble" class="bubble">
+        <div class="bubble-body">
+          <p id="title" class="title"></p>
+          <p id="detail" class="detail"></p>
+          <div id="gauges" class="gauges"></div>
+        </div>
+        <div class="bubble-tail"></div>
+      </div>
+      <canvas id="character" class="character" width="40" height="40"></canvas>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

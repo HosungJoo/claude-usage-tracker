@@ -4,23 +4,32 @@
   "description": "픽셀 클로드 캐릭터가 Claude 사용량을 먼저 알려주는 데스크톱 앱",
   "private": true,
   "type": "module",
-  "main": "out/main/index.js",
+  "main": "out/main/index.cjs",
   "scripts": {
     "cli": "tsx src/cli/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint . --ext .ts",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\""
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "dev": "electron-vite dev",
+    "demo": "electron-vite dev -- --demo",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "sprites": "tsx tools/preview-sprites.ts sprite-preview.png 6"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
     "@typescript-eslint/eslint-plugin": "^8.18.0",
     "@typescript-eslint/parser": "^8.18.0",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
     "eslint": "^8.57.1",
     "prettier": "^3.4.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
+    "vite": "^5.4.21",
     "vitest": "^2.1.8"
   }
 }
