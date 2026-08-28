@@ -15,7 +15,7 @@
   --warning: #e0a33a;
   --critical: #e5484d;
 
-  --pixel: 3px; /* 캐릭터 확대 배율. 정수만 쓴다 — 소수 배율은 픽셀을 뭉갠다. */
+  --pixel: 8px; /* 캐릭터 확대 배율. 정수만 쓴다 — 소수 배율은 픽셀을 뭉갠다. */
 }
 
 * {
@@ -50,8 +50,8 @@ body {
 /* ---------- 캐릭터 ---------- */
 
 .character {
-  width: calc(40 * var(--pixel));
-  height: calc(40 * var(--pixel));
+  width: calc(16 * var(--pixel));
+  height: calc(10 * var(--pixel));
   /* 픽셀 아트는 절대 보간하지 않는다. */
   image-rendering: pixelated;
   image-rendering: crisp-edges;

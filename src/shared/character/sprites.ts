@@ -2,230 +2,170 @@ import { PixelGrid } from '../pixel/grid.js';
 import { PALETTE } from './palette.js';
 
 /**
- * 픽셀 클로드 캐릭터.
+ * Claw'd — Claude Code의 마스코트.
  *
- * 형태는 Claude의 방사형 심볼에서 가져왔다 — 12개의 광선이 뻗은 몸통
- * 가운데에 얼굴이 있다. 광선은 장식이자 팔 역할을 해서, 손을 흔들거나
- * 놀라서 곤두서는 연출을 같은 부품으로 만들 수 있다.
+ * 형태는 원본 아트워크에서 픽셀 단위로 그대로 옮겼다. 16×10 격자,
+ * 코랄 단색, 외곽선 없음. 이 캐릭터의 인상은 단순함에서 나오므로
+ * 음영이나 테두리를 더하지 않는다.
+ *
+ * 표정은 원본이 가진 부품만으로 만든다 — 눈 슬릿의 높이와 위치, 팔의
+ * 각도. 입을 새로 그리지 않는 이유도 같다. 원본에 없는 것을 더하면
+ * 그 순간 다른 캐릭터가 된다.
+ *
+ * 원본 격자:
+ * ```
+ *   ..############..   머리
+ *   ..############..
+ *   ..##o######o##..   눈
+ *   ..##o######o##..
+ *   ################   팔이 좌우로 뻗은 밴드
+ *   ################
+ *   ..############..
+ *   ..############..
+ *   ...#.#....#.#...   다리 넷
+ *   ...#.#....#.#...
+ * ```
  */
 
-export const SPRITE_SIZE = 40;
+export const SPRITE_W = 16;
+export const SPRITE_H = 10;
 
-/**
- * 비율은 모두 캔버스 크기 기준으로 잡는다. 한 곳만 고치면 전체가 따라온다.
- *
- * 몸통은 작게, 광선은 길게 — 클로드 심볼의 인상은 '가운데 점'이 아니라
- * '뻗어나가는 획'에서 온다. 몸통을 키우면 성게처럼 보인다.
- */
-const CX = SPRITE_SIZE / 2 - 0.5;
-const CY = SPRITE_SIZE / 2 - 0.5;
-const BODY_R = SPRITE_SIZE * 0.255;
-const RAY_INNER = SPRITE_SIZE * 0.13;
-const RAY_OUTER = SPRITE_SIZE * 0.42;
-/**
- * 광선이 아무리 길어져도 넘지 못하는 한계.
- *
- * 실루엣이 캔버스 끝에 닿으면 윤곽선이 잘려서, 그 방향만 테두리가 없는
- * 채로 렌더된다. 2.5px을 남겨 두면 어떤 표정에서도 그럴 일이 없다.
- */
-const RAY_MAX = SPRITE_SIZE / 2 - 2.5;
-const RAY_WIDTH = SPRITE_SIZE * 0.175;
-const RAY_COUNT = 12;
+/** 몸통. 좌우 두 칸씩 비운 12칸 폭이 머리이자 몸이다. */
+const BODY_X = 2;
+const BODY_W = 12;
+const BODY_TOP = 0;
+const BODY_H = 8;
 
-/** 얼굴 배치. 몸통 반지름에 비례한다. */
-const EYE_DX = BODY_R * 0.5;
-const EYE_Y = CY - BODY_R * 0.16;
-const MOUTH_Y = CY + BODY_R * 0.52;
+/** 팔. 몸통 밖으로 두 칸씩 뻗는다. 기본 위치는 몸통 위에서 네 번째 줄. */
+const ARM_W = 2;
+const ARM_H = 2;
+const ARM_REST_Y = 4;
+
+/** 다리. 몸통 아래 두 줄. */
+const LEG_COLS = [3, 5, 10, 12] as const;
+const LEG_TOP = 8;
+const LEG_H = 2;
+
+/** 눈. 한 칸 폭의 세로 슬릿 둘. */
+const EYE_COLS = [4, 11] as const;
 
 export type Expression =
   | 'idle' // 평온
-  | 'blink' // 눈 감음 (idle의 변주)
-  | 'happy' // 여유 있을 때 보고
+  | 'blink' // 눈 감음
+  | 'happy' // 여유 — 눈웃음
   | 'talk' // 말하는 중
-  | 'wave' // 등장 인사
-  | 'worry' // 주의
-  | 'panic'; // 위험 / 한도 임박
+  | 'wave' // 등장 인사 — 한쪽 팔을 흔든다
+  | 'worry' // 주의 — 눈이 처지고 팔이 내려간다
+  | 'panic'; // 위험 — 눈이 커지고 두 팔이 올라간다
 
 export interface FrameOptions {
   expression: Expression;
-  /** 0부터 증가하는 프레임 번호. 광선 흔들림 등 미세한 변화에 쓴다. */
+  /** 0부터 증가하는 프레임 번호. */
   tick?: number;
 }
 
-/** 광선 12개. 표정에 따라 길이와 각도가 흔들린다. */
-function drawRays(g: PixelGrid, expression: Expression, tick: number): void {
-  for (let i = 0; i < RAY_COUNT; i++) {
-    const base = (i / RAY_COUNT) * Math.PI * 2 - Math.PI / 2;
-
-    let angle = base;
-    let outer = RAY_OUTER;
-
-    if (expression === 'panic') {
-      // 놀라서 광선이 곤두선다. 방향마다 다른 위상으로 떨려야 자연스럽다.
-      outer = RAY_OUTER + 1.4 * Math.sin(tick * 1.6 + i);
-      angle = base + 0.09 * Math.sin(tick * 2.1 + i * 1.7);
-    } else if (expression === 'worry') {
-      outer = RAY_OUTER - 1.6;
-    } else if (expression === 'wave') {
-      // 오른쪽 위 광선 하나만 팔처럼 크게 흔든다.
-      const isArm = i === 1;
-      if (isArm) {
-        outer = RAY_OUTER + 0.7;
-        angle = base + 0.55 * Math.sin(tick * 0.9);
-      }
-    } else {
-      // 평상시에도 아주 미세하게 숨쉬듯 움직인다.
-      outer = RAY_OUTER + 0.7 * Math.sin(tick * 0.35 + i * 0.5);
-    }
-
-    g.ray(CX, CY, angle, RAY_INNER, Math.min(RAY_MAX, outer), RAY_WIDTH, PALETTE.base);
-  }
-}
-
-/** 몸통 + 명암. 왼쪽 위에서 빛이 든다고 가정한다. */
-function drawBody(g: PixelGrid): void {
-  g.circle(CX, CY, BODY_R, PALETTE.base);
-
-  // 아래쪽 그림자를 먼저 깔고, 위쪽 하이라이트를 덮는다.
-  g.circle(CX + BODY_R * 0.16, CY + BODY_R * 0.24, BODY_R - 1.2, PALETTE.shadow);
-  g.circle(CX, CY, BODY_R - 0.2, PALETTE.base);
-  g.circle(CX - BODY_R * 0.2, CY - BODY_R * 0.24, BODY_R * 0.66, PALETTE.light);
-  g.circle(CX - BODY_R * 0.32, CY - BODY_R * 0.38, BODY_R * 0.3, PALETTE.highlight);
-}
-
 interface EyeShape {
-  /** 눈 중심. */
-  y: number;
-  rx: number;
-  ry: number;
-  /** 눈동자 오프셋. */
-  px: number;
-  py: number;
-  /** 눈을 감았으면 선으로 그린다. */
-  closed: boolean;
+  /** 눈이 시작하는 줄. */
+  top: number;
+  /** 눈의 높이(칸). */
+  height: number;
 }
 
-function eyeShapeFor(expression: Expression, tick: number): EyeShape {
+/**
+ * 표정마다 눈의 높이와 위치만 바뀐다.
+ *
+ * 16×10에서 쓸 수 있는 것은 이 두 값뿐이다. 그래서 각 표정이 서로
+ * 확실히 구별되도록 값을 겹치지 않게 골랐다.
+ */
+function eyeShapeFor(expression: Expression): EyeShape {
   switch (expression) {
     case 'blink':
-      return { y: EYE_Y, rx: 2.9, ry: 0.4, px: 0, py: 0, closed: true };
+      // 아래쪽 한 줄만 남긴다 — 눈을 감은 순간.
+      return { top: 3, height: 1 };
     case 'happy':
-      return { y: EYE_Y, rx: 3.0, ry: 2.1, px: 0, py: -0.5, closed: false };
+      // 위쪽 한 줄만. 감은 눈이되 위치가 높아 웃는 인상이 된다.
+      return { top: 2, height: 1 };
     case 'worry':
-      return { y: EYE_Y + 0.4, rx: 2.8, ry: 2.8, px: 0, py: 0.7, closed: false };
+      // 한 줄 아래로 처진다.
+      return { top: 3, height: 2 };
     case 'panic':
-      // 눈이 커지고 눈동자가 작아진다 — 놀란 표정의 핵심.
-      return { y: EYE_Y - 0.4, rx: 3.6, ry: 3.9, px: 0, py: 0, closed: false };
-    case 'talk':
-      return { y: EYE_Y, rx: 3.0, ry: 3.0, px: 0.4 * Math.sin(tick * 0.5), py: 0, closed: false };
+      // 위아래로 벌어져 놀란 눈.
+      return { top: 1, height: 3 };
     default:
-      return { y: EYE_Y, rx: 3.0, ry: 3.0, px: 0, py: 0, closed: false };
+      return { top: 2, height: 2 };
   }
 }
 
-function drawEyes(g: PixelGrid, expression: Expression, tick: number): void {
-  const s = eyeShapeFor(expression, tick);
-  const eyes = [CX - EYE_DX, CX + EYE_DX];
-
-  for (const ex of eyes) {
-    if (s.closed) {
-      // 직선보다 아래로 볼록한 호가 '기분 좋게 감은 눈'으로 읽힌다.
-      for (let dx = -3; dx <= 3; dx++) {
-        g.set(Math.round(ex + dx), Math.round(s.y + Math.abs(dx) * 0.45), PALETTE.pupil);
-      }
-      continue;
-    }
-    g.ellipse(ex, s.y, s.rx, s.ry, PALETTE.eyeWhite);
-
-    const pr = expression === 'panic' ? 1.3 : 1.5;
-    // 눈동자는 눈 안에서 살짝 아래에 둔다. 위쪽 흰자가 보이면 순한 인상이 된다.
-    const pupilY = s.y + s.py + s.ry * 0.18;
-    g.ellipse(ex + s.px, pupilY, pr, pr, PALETTE.pupil);
-    // 반사광 한 점. 이게 있고 없고로 캐릭터가 살아 보이는지가 갈린다.
-    g.rect(Math.round(ex + s.px - 0.9), Math.round(pupilY - 1.1), 1, 1, PALETTE.eyeWhite);
-  }
-
-  if (expression === 'worry' || expression === 'panic') {
-    // 눈썹을 안쪽으로 내려 걱정스러운 인상을 만든다.
-    const dy = expression === 'panic' ? 5.6 : 5.2;
-    g.line(CX - EYE_DX - 3, s.y - dy, CX - EYE_DX + 2, s.y - dy + 1.6, PALETTE.outline, 1);
-    g.line(CX + EYE_DX + 3, s.y - dy, CX + EYE_DX - 2, s.y - dy + 1.6, PALETTE.outline, 1);
-  }
-}
-
-function drawMouth(g: PixelGrid, expression: Expression, tick: number): void {
-  const my = MOUTH_Y;
+/** 왼팔·오른팔이 각각 몇 줄에 놓일지. 음수일수록 위로 올라간 것이다. */
+function armOffsets(expression: Expression, tick: number): [number, number] {
   switch (expression) {
+    case 'wave':
+      // 오른팔만 위아래로 흔든다. 두 프레임을 오가는 게 저해상도에서
+      // 가장 또렷하게 '흔든다'로 읽힌다.
+      return [0, tick % 2 === 0 ? -3 : -1];
+    case 'panic':
+      // 두 팔을 번쩍. 프레임마다 한 칸씩 떨린다.
+      return tick % 2 === 0 ? [-3, -3] : [-2, -2];
+    case 'worry':
+      // 축 처진다.
+      return [2, 2];
     case 'happy':
-    case 'wave': {
-      // 화면 y는 아래로 증가하므로, 끝이 올라가려면 y를 빼야 한다.
-      for (let dx = -3; dx <= 3; dx++) {
-        g.set(Math.round(CX + dx), Math.round(my + 1 - dx * dx * 0.22), PALETTE.mouth);
-      }
-      break;
-    }
-    case 'talk': {
-      // 두 프레임을 오가며 입이 열렸다 닫힌다.
-      const open = tick % 2 === 0;
-      if (open) {
-        g.ellipse(CX, my, 2.3, 1.9, PALETTE.mouth);
-        g.ellipse(CX, my + 0.8, 1.3, 0.7, PALETTE.tongue);
-      } else {
-        g.line(CX - 2.6, my, CX + 2.6, my, PALETTE.mouth, 1);
-      }
-      break;
-    }
-    case 'worry': {
-      // 끝이 처진 입.
-      for (let dx = -3; dx <= 3; dx++) {
-        g.set(Math.round(CX + dx), Math.round(my - 1 + dx * dx * 0.22), PALETTE.mouth);
-      }
-      break;
-    }
-    case 'panic': {
-      const wobble = tick % 2 === 0 ? 0 : 0.4;
-      g.ellipse(CX, my + 0.3, 2.8 + wobble, 3.0 + wobble, PALETTE.mouth);
-      g.ellipse(CX, my + 1.5, 1.5, 1.0, PALETTE.tongue);
-      break;
-    }
-    case 'blink':
-    case 'idle':
-    default: {
-      g.line(CX - 2.0, my, CX + 2.0, my, PALETTE.mouth, 1);
-      break;
-    }
+      // 두 팔을 살짝 든다. 눈만으로는 blink와 구별되지 않는다 —
+      // 이 해상도에서 표정 하나에 신호 하나로는 부족하다.
+      return [-2, -2];
+    case 'talk':
+      // 두 팔을 번갈아 든다. 어느 프레임도 idle과 같지 않아야 한다 —
+      // 같으면 말하기 시작한 순간에 아무 변화가 없다.
+      return tick % 2 === 0 ? [-1, 0] : [0, -1];
+    default:
+      return [0, 0];
   }
 }
 
-/** 양 볼. 위험할수록 진해진다. */
-function drawBlush(g: PixelGrid, expression: Expression): void {
-  if (expression !== 'panic' && expression !== 'happy' && expression !== 'wave') return;
-  const color = expression === 'panic' ? PALETTE.danger : PALETTE.blush;
-  for (const ex of [CX - BODY_R * 0.82, CX + BODY_R * 0.82]) {
-    g.ellipse(ex, MOUTH_Y - 1.4, 2.0, 1.2, color);
+function drawBody(g: PixelGrid): void {
+  g.rect(BODY_X, BODY_TOP, BODY_W, BODY_H, PALETTE.body);
+}
+
+function drawArms(g: PixelGrid, expression: Expression, tick: number): void {
+  const [left, right] = armOffsets(expression, tick);
+  // 팔이 캔버스를 벗어나면 잘린 채 그려진다. 위아래로 가둔다.
+  const clamp = (y: number): number => Math.max(0, Math.min(SPRITE_H - ARM_H, y));
+
+  g.rect(0, clamp(ARM_REST_Y + left), ARM_W, ARM_H, PALETTE.body);
+  g.rect(SPRITE_W - ARM_W, clamp(ARM_REST_Y + right), ARM_W, ARM_H, PALETTE.body);
+}
+
+function drawLegs(g: PixelGrid, expression: Expression, tick: number): void {
+  // 놀랐을 때만 다리가 한 칸 오므라든다. 그 외에는 원본 그대로.
+  const tuck = expression === 'panic' && tick % 2 === 1;
+  for (const col of LEG_COLS) {
+    g.rect(col, LEG_TOP, 1, tuck ? LEG_H - 1 : LEG_H, PALETTE.body);
+  }
+}
+
+function drawEyes(g: PixelGrid, expression: Expression): void {
+  const { top, height } = eyeShapeFor(expression);
+  for (const col of EYE_COLS) {
+    g.rect(col, top, 1, height, PALETTE.eye);
   }
 }
 
 /** 한 프레임을 그린다. */
 export function buildFrame(options: FrameOptions): PixelGrid {
   const { expression, tick = 0 } = options;
-  const g = new PixelGrid(SPRITE_SIZE, SPRITE_SIZE);
+  const g = new PixelGrid(SPRITE_W, SPRITE_H);
 
-  drawRays(g, expression, tick);
   drawBody(g);
-  // 윤곽선은 얼굴을 올리기 전에 — 얼굴 요소까지 테두리가 생기면 지저분해진다.
-  g.outline(PALETTE.outline);
-
-  drawBlush(g, expression);
-  drawEyes(g, expression, tick);
-  drawMouth(g, expression, tick);
+  drawArms(g, expression, tick);
+  drawLegs(g, expression, tick);
+  // 눈은 몸통 위에 뚫는다. 순서가 바뀌면 몸통이 눈을 덮는다.
+  drawEyes(g, expression);
 
   return g;
 }
 
 /** 표정별 애니메이션 정의. 렌더러는 이 목록만 보고 프레임을 돌린다. */
 export interface AnimationSpec {
-  /** 각 프레임에 넘길 tick 값. */
   ticks: number[];
   /** 프레임당 유지 시간(ms). */
   frameMs: number;
@@ -233,13 +173,13 @@ export interface AnimationSpec {
 }
 
 export const ANIMATIONS: Record<Expression, AnimationSpec> = {
-  idle: { ticks: [0, 1, 2, 3, 4, 5, 6, 7], frameMs: 220, loop: true },
+  idle: { ticks: [0], frameMs: 400, loop: false },
   blink: { ticks: [0], frameMs: 120, loop: false },
-  happy: { ticks: [0, 1, 2, 3], frameMs: 220, loop: true },
-  talk: { ticks: [0, 1], frameMs: 160, loop: true },
-  wave: { ticks: [0, 1, 2, 3, 4, 5], frameMs: 120, loop: true },
-  worry: { ticks: [0, 1], frameMs: 300, loop: true },
-  panic: { ticks: [0, 1, 2, 3], frameMs: 100, loop: true },
+  happy: { ticks: [0], frameMs: 400, loop: false },
+  talk: { ticks: [0, 1], frameMs: 220, loop: true },
+  wave: { ticks: [0, 1], frameMs: 260, loop: true },
+  worry: { ticks: [0], frameMs: 400, loop: false },
+  panic: { ticks: [0, 1], frameMs: 160, loop: true },
 };
 
 export const ALL_EXPRESSIONS: Expression[] = [

@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { PixelGrid } from '../src/shared/pixel/grid.js';
 import { encodePNG } from '../src/shared/pixel/png.js';
-import { ALL_EXPRESSIONS, ANIMATIONS, buildFrame, SPRITE_SIZE } from '../src/shared/character/sprites.js';
+import { ALL_EXPRESSIONS, ANIMATIONS, buildFrame, SPRITE_H, SPRITE_W } from '../src/shared/character/sprites.js';
 
 /**
  * 표정별 프레임을 한 장의 시트로 뽑아 눈으로 확인하는 개발 도구.
@@ -15,8 +15,8 @@ const BG = '#1a1a1a';
 const BG_ALT = '#242424';
 
 const maxFrames = Math.max(...ALL_EXPRESSIONS.map((e) => ANIMATIONS[e].ticks.length));
-const cellW = SPRITE_SIZE + PAD * 2;
-const cellH = SPRITE_SIZE + PAD * 2;
+const cellW = SPRITE_W + PAD * 2;
+const cellH = SPRITE_H + PAD * 2;
 const sheetW = cellW * maxFrames;
 const sheetH = cellH * ALL_EXPRESSIONS.length;
 
@@ -32,8 +32,8 @@ ALL_EXPRESSIONS.forEach((expr, row) => {
     const frame = buildFrame({ expression: expr, tick });
     const ox = col * cellW + PAD;
     const oy = row * cellH + PAD;
-    for (let y = 0; y < SPRITE_SIZE; y++) {
-      for (let x = 0; x < SPRITE_SIZE; x++) {
+    for (let y = 0; y < SPRITE_H; y++) {
+      for (let x = 0; x < SPRITE_W; x++) {
         const p = frame.get(x, y);
         if (p !== null) sheet.set(ox + x, oy + y, p);
       }

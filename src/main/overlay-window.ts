@@ -32,7 +32,7 @@ export const DEFAULT_PLACEMENT: OverlayPlacement = {
 
 /** 캐릭터 + 말풍선이 들어가는 창 크기. */
 export const OVERLAY_WIDTH = 380;
-export const OVERLAY_HEIGHT = 264;
+export const OVERLAY_HEIGHT = 232;
 
 function resolveDisplay(placement: OverlayPlacement): Display {
   if (placement.display === 'primary') return screen.getPrimaryDisplay();

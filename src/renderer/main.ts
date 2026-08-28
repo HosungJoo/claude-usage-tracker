@@ -1,5 +1,5 @@
 import { CharacterAnimator } from '../shared/character/animator.js';
-import { SPRITE_SIZE } from '../shared/character/sprites.js';
+import { SPRITE_H, SPRITE_W } from '../shared/character/sprites.js';
 import type { GaugeInfo, ShowRequest } from '../shared/ipc.js';
 import type { OverlayApi } from '../preload/index.js';
 
@@ -29,7 +29,7 @@ const paint = ctx;
 paint.imageSmoothingEnabled = false;
 
 const animator = new CharacterAnimator();
-const imageData = paint.createImageData(SPRITE_SIZE, SPRITE_SIZE);
+const imageData = paint.createImageData(SPRITE_W, SPRITE_H);
 
 let lastFrameTime = performance.now();
 let hideTimer: number | null = null;
