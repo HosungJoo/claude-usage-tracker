@@ -27,8 +27,11 @@ const GREETABLE_SOURCES = new Set(['startup', 'resume']);
 export interface GreeterDeps {
   /** 지금 사용량을 다시 읽어온다. 없으면(오류 등) null. */
   refresh: () => Promise<UsageSnapshot | null>;
-  /** 캐릭터를 띄운다. */
-  present: (line: Line, snapshot: UsageSnapshot) => void;
+  /**
+   * 캐릭터를 띄운다.
+   * @param cwd 세션의 작업 디렉터리. 어느 창 옆에 띄울지 정하는 데 쓴다.
+   */
+  present: (line: Line, snapshot: UsageSnapshot, cwd: string | null) => void;
   now?: () => number;
 }
 
@@ -71,7 +74,7 @@ export class SessionGreeter {
 
     if (withinCooldown) return;
     this.lastGreetAt = this.now();
-    this.deps.present(lineForGreeting(snapshot, snapshot.fetchedAt), snapshot);
+    this.deps.present(lineForGreeting(snapshot, snapshot.fetchedAt), snapshot, event.cwd ?? null);
   }
 
   private async onSessionEnd(event: HookEvent): Promise<void> {
@@ -87,7 +90,7 @@ export class SessionGreeter {
 
     const line = lineForSessionEnd(snapshot, startPercent, snapshot.fetchedAt);
     if (!line) return;
-    this.deps.present(line, snapshot);
+    this.deps.present(line, snapshot, event.cwd ?? null);
   }
 
   /** 추적 중인 세션 수. 진단용. */

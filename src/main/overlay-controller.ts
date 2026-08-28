@@ -1,5 +1,6 @@
 import type { BrowserWindow } from 'electron';
 import { ipcMain } from 'electron';
+import { cancelReassert, showOverlay } from './overlay-window.js';
 import type { Line } from '../shared/character/script.js';
 import { IPC, type GaugeInfo, type ShowRequest } from '../shared/ipc.js';
 import type { Severity } from '../core/types.js';
@@ -67,6 +68,7 @@ export class OverlayController {
   private handleDismissed = (_e: unknown, id: number): void => {
     if (this.showing?.id !== id) return;
     this.showing = null;
+    cancelReassert(this.win);
     this.win.hide();
     this.scheduleNext();
   };
@@ -102,6 +104,7 @@ export class OverlayController {
       this.gapTimer = null;
     }
     if (!this.win.isDestroyed()) {
+      cancelReassert(this.win);
       this.win.webContents.send(IPC.hide);
       this.win.hide();
     }
@@ -128,8 +131,8 @@ export class OverlayController {
       gauges: next.gauges,
     };
 
-    // showInactive: 포커스를 훔치지 않고 띄운다. 사용자가 타이핑 중일 수 있다.
-    this.win.showInactive();
+    // 포커스를 훔치지 않고 띄우되, 뜬 뒤에 항상-위를 다시 건다.
+    showOverlay(this.win);
     this.win.webContents.send(IPC.show, req);
 
     // 렌더러가 죽거나 dismissed를 못 보내도 큐가 막히지 않도록 안전망을 둔다.

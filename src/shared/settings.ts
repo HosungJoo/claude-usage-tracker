@@ -9,7 +9,25 @@ import type { Corner } from '../main/overlay-window.js';
  * 되돌릴 방법이 없어진다.
  */
 
+/**
+ * 캐릭터를 어디에 띄울지.
+ *
+ * 'screen'  화면 모서리 — 항상 같은 자리라 예측 가능하다.
+ * 'window'  작업 중인 창의 모서리 — 보고 있는 곳 가까이에 뜬다.
+ *           창을 찾지 못하면(네이티브 Wayland 앱 등) 화면 모서리로 물러난다.
+ */
+export type Anchor = 'screen' | 'window';
+
+export const ANCHORS: Anchor[] = ['screen', 'window'];
+
+export const ANCHOR_LABEL: Record<Anchor, string> = {
+  screen: '화면 모서리',
+  window: '작업 중인 창',
+};
+
 export interface Settings {
+  /** 화면 기준으로 띄울지, 작업 중인 창 기준으로 띄울지. */
+  anchor: Anchor;
   /** 발화 임계값(%). 오름차순, 중복 없음. */
   thresholds: number[];
   /** 폴링 주기(초). */
@@ -29,9 +47,13 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  // 화면 기준이 기본이다. 창 기준은 X11 창(XWayland로 뜬 편집기·터미널)에서만
+  // 동작하는데, 요즘 리눅스 데스크톱의 터미널은 대개 네이티브 Wayland 창이라
+  // 위치를 물어볼 수 없다. 되는 환경에서만 켜서 쓰는 편이 맞다.
+  anchor: 'screen',
   thresholds: [...DEFAULT_THRESHOLDS],
   pollIntervalSec: 60,
-  corner: 'bottom-right',
+  corner: 'top-left',
   margin: 24,
   holdScale: 1,
   characterEnabled: true,
@@ -92,6 +114,10 @@ function isCorner(value: unknown): value is Corner {
   return typeof value === 'string' && (CORNERS as string[]).includes(value);
 }
 
+function isAnchor(value: unknown): value is Anchor {
+  return typeof value === 'string' && (ANCHORS as string[]).includes(value);
+}
+
 /** 무엇이 들어오든 쓸 수 있는 설정으로 만든다. 절대 던지지 않는다. */
 export function normalizeSettings(raw: unknown): Settings {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
@@ -100,6 +126,7 @@ export function normalizeSettings(raw: unknown): Settings {
   const o = raw as Record<string, unknown>;
 
   return {
+    anchor: isAnchor(o['anchor']) ? o['anchor'] : DEFAULT_SETTINGS.anchor,
     thresholds: normalizeThresholds(o['thresholds']),
     pollIntervalSec: num(o['pollIntervalSec'], DEFAULT_SETTINGS.pollIntervalSec, MIN_POLL_SEC, MAX_POLL_SEC),
     corner: isCorner(o['corner']) ? o['corner'] : DEFAULT_SETTINGS.corner,

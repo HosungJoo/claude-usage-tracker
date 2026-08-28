@@ -10,8 +10,15 @@ const ipcHandlers = new Map<string, (e: unknown, ...args: never[]) => void>();
 const wcHandlers = new Map<string, Array<(...args: never[]) => void>>();
 
 const sent: Array<{ channel: string; payload?: unknown }> = [];
-const calls = { show: 0, hide: 0, ignoreMouse: [] as boolean[] };
+const calls = {
+  show: 0,
+  hide: 0,
+  ignoreMouse: [] as boolean[],
+  /** setAlwaysOnTop 호출 시각(ms). 띄운 뒤 다시 거는지 보려면 순서가 중요하다. */
+  alwaysOnTop: [] as number[],
+};
 let loading = false;
+let visible = false;
 
 function fireWc(event: string): void {
   for (const h of wcHandlers.get(event) ?? []) h();
@@ -19,15 +26,22 @@ function fireWc(event: string): void {
 
 const fakeWin = {
   isDestroyed: () => false,
+  isVisible: () => visible,
   showInactive: () => {
     calls.show++;
+    visible = true;
   },
   hide: () => {
     calls.hide++;
+    visible = false;
   },
   setIgnoreMouseEvents: (ignore: boolean) => {
     calls.ignoreMouse.push(ignore);
   },
+  setAlwaysOnTop: () => {
+    calls.alwaysOnTop.push(Date.now());
+  },
+  setVisibleOnAllWorkspaces: () => {},
   webContents: {
     isLoading: () => loading,
     send: (channel: string, payload?: unknown) => sent.push({ channel, payload }),
@@ -81,7 +95,9 @@ beforeEach(() => {
   calls.show = 0;
   calls.hide = 0;
   calls.ignoreMouse.length = 0;
+  calls.alwaysOnTop.length = 0;
   loading = false;
+  visible = false;
 });
 
 describe('OverlayController', () => {
@@ -97,6 +113,19 @@ describe('OverlayController', () => {
     // 잘못 부르면 여기서 터진다.
     const c = make();
     expect(() => c.enqueue(line('x'), 'normal', [])).not.toThrow();
+    expect(calls.show).toBe(1);
+  });
+
+  it('띄운 뒤 항상-위를 다시 건다', () => {
+    // 리눅스에서 show는 항상-위 설정을 비동기로 지운다. 한 번만 걸면
+    // 캐릭터가 다른 창 뒤로 갈 수 있다.
+    const c = make();
+    c.enqueue(line('x'), 'normal', []);
+    const immediate = calls.alwaysOnTop.length;
+    expect(immediate).toBeGreaterThan(0);
+
+    vi.advanceTimersByTime(500);
+    expect(calls.alwaysOnTop.length).toBeGreaterThan(immediate);
   });
 
   it('렌더러가 아직 로딩 중이면 보내지 않고 기다린다', () => {

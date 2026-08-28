@@ -18,6 +18,7 @@ import { SettingsStore } from './settings-store.js';
 import { openSettings, settingsRendererTarget } from './settings-window.js';
 import { UsageTray } from './tray.js';
 import { applyAutostart } from './autostart.js';
+import { findWorkingWindow } from './window-anchor.js';
 import {
   createOverlayWindow,
   repositionOverlay,
@@ -51,9 +52,36 @@ let subscription: string | null = null;
 const DEMO = process.argv.includes('--demo');
 const CAPTURE = process.argv.find((a) => a.startsWith('--capture='))?.slice('--capture='.length);
 
-function placement(): OverlayPlacement {
+function placement(anchorRect?: OverlayPlacement['anchorRect']): OverlayPlacement {
   const s = store.value;
-  return { corner: s.corner, margin: s.margin, display: 'cursor' };
+  return {
+    corner: s.corner,
+    margin: s.margin,
+    display: 'cursor',
+    ...(anchorRect ? { anchorRect } : {}),
+  };
+}
+
+/**
+ * 띄우기 직전에 배치를 정한다.
+ *
+ * '작업 중인 창' 모드에서는 매번 창 위치를 다시 본다 — 사용자가 창을
+ * 옮기거나 다른 창으로 넘어가면 캐릭터도 따라가야 의미가 있다.
+ * 창을 찾지 못하면 화면 모서리로 물러난다.
+ */
+async function applyPlacement(cwd: string | null = null): Promise<void> {
+  if (!overlayWin || overlayWin.isDestroyed()) return;
+
+  let anchorRect: OverlayPlacement['anchorRect'];
+  if (store.value.anchor === 'window') {
+    const found = await findWorkingWindow(cwd);
+    if (found) {
+      anchorRect = { x: found.x, y: found.y, width: found.width, height: found.height };
+    } else {
+      logger.info('작업 중인 창을 찾지 못해 화면 모서리에 띄웁니다.');
+    }
+  }
+  repositionOverlay(overlayWin, placement(anchorRect));
 }
 
 /** 설정의 표시 시간 배율을 대사에 적용한다. */
@@ -63,9 +91,18 @@ function scaled(line: Line): Line {
 }
 
 /** 캐릭터를 띄운다. 설정에서 껐으면 아무 일도 하지 않는다. */
-function present(line: Line, severity: Severity, snapshot: UsageSnapshot | null): void {
+function present(
+  line: Line,
+  severity: Severity,
+  snapshot: UsageSnapshot | null,
+  cwd: string | null = null,
+): void {
   if (!store.value.characterEnabled) return;
-  controller?.enqueue(scaled(line), severity, snapshot ? gaugesFromSnapshot(snapshot) : []);
+  // 자리를 먼저 잡고 띄운다. 순서가 바뀌면 캐릭터가 옛 자리에서 한 번
+  // 깜박였다가 옮겨 간다.
+  void applyPlacement(cwd).then(() => {
+    controller?.enqueue(scaled(line), severity, snapshot ? gaugesFromSnapshot(snapshot) : []);
+  });
 }
 
 function rendererTarget(): { rendererUrl?: string; rendererFile?: string } {
@@ -104,7 +141,7 @@ function createOverlay(): void {
 
 function watchDisplays(): void {
   const reposition = (): void => {
-    if (overlayWin) repositionOverlay(overlayWin, placement());
+    void applyPlacement();
   };
   screen.on('display-added', reposition);
   screen.on('display-removed', reposition);
@@ -154,9 +191,9 @@ function onSettingsChanged(next: Settings, prev: Settings): void {
     startPolling();
   }
 
-  if (next.corner !== prev.corner || next.margin !== prev.margin) {
+  if (next.corner !== prev.corner || next.margin !== prev.margin || next.anchor !== prev.anchor) {
     if (overlayWin) {
-      repositionOverlay(overlayWin, placement());
+      void applyPlacement();
       void overlayWin.webContents.executeJavaScript(
         `document.body.dataset.align = ${JSON.stringify(next.corner)};`,
       );
@@ -188,9 +225,9 @@ function autostartCommand(): string {
 function startSessionHooks(): void {
   greeter = new SessionGreeter({
     refresh: async () => (await poller?.refreshNow()) ?? null,
-    present: (line, snapshot) => {
+    present: (line, snapshot, cwd) => {
       if (!store.value.greetOnSessionStart) return;
-      present(line, snapshot.severity, snapshot);
+      present(line, snapshot.severity, snapshot, cwd);
     },
   });
 

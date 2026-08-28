@@ -1,4 +1,6 @@
 import {
+  ANCHORS,
+  ANCHOR_LABEL,
   CORNERS,
   CORNER_LABEL,
   normalizeThresholds,
@@ -34,6 +36,8 @@ const els = {
   interval: $<HTMLInputElement>('interval'),
   intervalOut: $<HTMLOutputElement>('interval-out'),
   character: $<HTMLInputElement>('character'),
+  anchor: $<HTMLSelectElement>('anchor'),
+  anchorHint: $<HTMLParagraphElement>('anchor-hint'),
   corner: $<HTMLSelectElement>('corner'),
   margin: $<HTMLInputElement>('margin'),
   marginOut: $<HTMLOutputElement>('margin-out'),
@@ -72,6 +76,11 @@ function render(settings: Settings): void {
   els.interval.value = String(settings.pollIntervalSec);
   els.intervalOut.textContent = formatSeconds(settings.pollIntervalSec);
   els.character.checked = settings.characterEnabled;
+  els.anchor.value = settings.anchor;
+  els.anchorHint.textContent =
+    settings.anchor === 'window'
+      ? '작업 중인 창(편집기·터미널)의 모서리에 붙습니다. 창을 찾지 못하면 화면 모서리로 물러납니다.'
+      : '어느 창을 쓰든 화면의 같은 자리에 뜹니다.';
   els.corner.value = settings.corner;
   els.margin.value = String(settings.margin);
   els.marginOut.textContent = `${settings.margin}px`;
@@ -79,7 +88,7 @@ function render(settings: Settings): void {
   els.autostart.checked = settings.autostart;
 
   // 캐릭터를 끄면 위치·여백·미리보기는 의미가 없다.
-  for (const el of [els.corner, els.margin, els.preview]) {
+  for (const el of [els.anchor, els.corner, els.margin, els.preview]) {
     el.disabled = !settings.characterEnabled;
   }
 }
@@ -144,6 +153,9 @@ els.margin.addEventListener('change', () => void save({ margin: Number(els.margi
 els.character.addEventListener('change', () =>
   void save({ characterEnabled: els.character.checked }),
 );
+els.anchor.addEventListener('change', () =>
+  void save({ anchor: els.anchor.value as Settings['anchor'] }),
+);
 els.corner.addEventListener('change', () =>
   void save({ corner: els.corner.value as Settings['corner'] }),
 );
@@ -177,6 +189,13 @@ els.hookToggle.addEventListener('click', async () => {
 });
 
 /* ---------- 초기화 ---------- */
+
+for (const anchor of ANCHORS) {
+  const opt = document.createElement('option');
+  opt.value = anchor;
+  opt.textContent = ANCHOR_LABEL[anchor];
+  els.anchor.append(opt);
+}
 
 for (const corner of CORNERS) {
   const opt = document.createElement('option');
