@@ -151,6 +151,15 @@ describe('EventSpool', () => {
     await spool.stop();
   });
 
+  it('동기 정리도 디렉터리를 지운다', async () => {
+    // Electron의 before-quit은 프로미스를 기다려 주지 않는다.
+    const dir = join(base, 'events');
+    const spool = new EventSpool(() => {}, dir, () => NOW);
+    await spool.start();
+    spool.stopSync();
+    expect(existsSync(dir)).toBe(false);
+  });
+
   it('디렉터리가 사라져도 죽지 않는다', async () => {
     const spool = new EventSpool(() => {}, join(base, '없는곳', 'events'), () => NOW);
     await expect(spool.drain()).resolves.toBeUndefined();

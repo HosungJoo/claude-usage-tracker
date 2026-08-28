@@ -1,0 +1,255 @@
+/*
+ * 설정 화면.
+ *
+ * 오버레이와 달리 이 창은 사용자가 들여다보며 읽는 화면이다. 픽셀 미감을
+ * 흉내 내기보다, 값을 빠르게 찾고 고칠 수 있는 쪽을 택했다. 캐릭터의
+ * 코랄만 강조색으로 가져온다.
+ */
+
+:root {
+  --coral: #c0532f;
+  --ground: #faf7f5;
+  --surface: #ffffff;
+  --ink: #241812;
+  --muted: #8a7266;
+  --edge: #e7dcd5;
+  --danger: #c8383d;
+  --ok: #3f8a60;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --coral: #e08a68;
+    --ground: #17120f;
+    --surface: #201a17;
+    --ink: #f2e8e2;
+    --muted: #a08a7d;
+    --edge: #332924;
+    --danger: #e5686c;
+    --ok: #5cb488;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: 'Pretendard', 'Noto Sans KR', system-ui, sans-serif;
+  font-size: 13.5px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+main {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 28px 28px 40px;
+}
+
+header {
+  margin-bottom: 26px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.status {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+section {
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  padding: 6px 18px 14px;
+  margin-bottom: 16px;
+}
+
+h2 {
+  margin: 14px 0 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* 라벨과 컨트롤을 두 칸으로 — 값이 어디 있는지 눈이 바로 찾는다. */
+.field {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 16px;
+  align-items: start;
+  padding: 12px 0;
+  border-top: 1px solid var(--edge);
+}
+
+.field:first-of-type {
+  border-top: none;
+}
+
+.field > label {
+  padding-top: 5px;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.78rem;
+}
+
+input[type='text'],
+select {
+  width: 100%;
+  padding: 7px 10px;
+  background: var(--ground);
+  color: var(--ink);
+  border: 1px solid var(--edge);
+  border-radius: 5px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+input[type='text']:focus-visible,
+select:focus-visible,
+button:focus-visible,
+input[type='range']:focus-visible,
+input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: 2px;
+}
+
+input[type='text'][aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+input[type='range'] {
+  flex: 1;
+  accent-color: var(--coral);
+}
+
+.num {
+  min-width: 68px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+
+.switch input {
+  accent-color: var(--coral);
+  width: 15px;
+  height: 15px;
+}
+
+button {
+  /* 버튼이 칸을 가득 채우면 입력 필드처럼 보인다. 내용 폭만 차지한다. */
+  align-self: flex-start;
+  padding: 6px 13px;
+  background: var(--coral);
+  color: #fff;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button.ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--edge);
+}
+
+button.ghost.danger {
+  color: var(--danger);
+}
+
+button:hover {
+  filter: brightness(1.06);
+}
+
+.pill {
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 99px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+.pill.on {
+  color: var(--ok);
+}
+
+.pill.off {
+  color: var(--muted);
+}
+
+footer {
+  height: 20px;
+}
+
+.saved {
+  margin: 0;
+  color: var(--ok);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+#paths {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.72rem;
+  word-break: break-all;
+}
+
+@media (max-width: 520px) {
+  .field {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .field > label {
+    padding-top: 0;
+  }
+}

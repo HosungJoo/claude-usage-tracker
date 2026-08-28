@@ -1,5 +1,5 @@
 import { mkdir, readdir, readFile, rm, unlink } from 'node:fs/promises';
-import { watch, type FSWatcher } from 'node:fs';
+import { rmSync, watch, type FSWatcher } from 'node:fs';
 import { join } from 'node:path';
 import { eventSpoolDir } from '../shared/runtime-paths.js';
 import type { HookEvent } from '../hooks/hook-script.js';
@@ -55,11 +55,7 @@ export class EventSpool {
     this.sweepTimer = setInterval(() => void this.drain(), SWEEP_INTERVAL_MS);
   }
 
-  /**
-   * 디렉터리를 지운다 — 훅에게 "앱이 내려갔다"고 알리는 방법이다.
-   * 이게 없으면 앱이 꺼진 뒤에도 훅이 파일을 계속 쌓는다.
-   */
-  async stop(): Promise<void> {
+  private teardown(): void {
     this.started = false;
     this.watcher?.close();
     this.watcher = null;
@@ -67,7 +63,31 @@ export class EventSpool {
       clearInterval(this.sweepTimer);
       this.sweepTimer = null;
     }
+  }
+
+  /**
+   * 디렉터리를 지운다 — 훅에게 "앱이 내려갔다"고 알리는 방법이다.
+   * 이게 없으면 앱이 꺼진 뒤에도 훅이 파일을 계속 쌓는다.
+   */
+  async stop(): Promise<void> {
+    this.teardown();
     await rm(this.dir, { recursive: true, force: true }).catch(() => {});
+  }
+
+  /**
+   * 종료 직전에 부르는 동기 정리.
+   *
+   * Electron의 before-quit은 프로미스를 기다려 주지 않는다. 비동기로
+   * 지우면 앱이 먼저 죽고 디렉터리가 남아, 이후의 모든 세션에서 훅이
+   * 읽는 이 없는 파일을 계속 쌓는다.
+   */
+  stopSync(): void {
+    this.teardown();
+    try {
+      rmSync(this.dir, { recursive: true, force: true });
+    } catch {
+      // 지우지 못해도 종료는 계속되어야 한다.
+    }
   }
 
   /** 쌓인 이벤트 파일을 모두 읽어 처리하고 지운다. */
