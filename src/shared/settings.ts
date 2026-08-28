@@ -26,9 +26,29 @@ export const ANCHOR_LABEL: Record<Anchor, string> = {
   window: '작업 중인 창',
 };
 
+/**
+ * 어느 모니터에 띄울지.
+ *
+ * 'primary' 주 모니터 — 항상 같은 화면이라 예측 가능하다.
+ * 'cursor'  커서가 있는 화면.
+ * 숫자      특정 모니터의 id.
+ *
+ * 기본이 'cursor'가 아닌 이유: **Wayland에서는 앱이 마우스 위치를 알 수
+ * 없다.** Electron은 XWayland의 포인터를 읽는데, XWayland는 자기 창 위에
+ * 있을 때만 포인터를 본다. 마우스가 네이티브 Wayland 창(GNOME Terminal,
+ * Tilix 등)으로 넘어가면 좌표가 마지막 위치에 멈춘 채로 남는다.
+ *
+ * 실측으로 확인했다. 마우스를 다른 모니터에서 크게 움직이는 동안에도
+ * XQueryPointer 는 6초 내내 같은 좌표를 돌려줬고, 그 좌표는 반대편
+ * 모니터에 있는 VS Code 창 안쪽이었다.
+ */
+export type DisplayChoice = 'cursor' | 'primary' | number;
+
 export interface Settings {
   /** 화면 기준으로 띄울지, 작업 중인 창 기준으로 띄울지. */
   anchor: Anchor;
+  /** 어느 모니터에 띄울지. */
+  display: DisplayChoice;
   /** 발화 임계값(%). 오름차순, 중복 없음. */
   thresholds: number[];
   /** 폴링 주기(초). */
@@ -58,6 +78,8 @@ export const DEFAULT_SETTINGS: Settings = {
   // 한가운데 크게가 기본이다. 이 앱의 실패 방식은 '캐릭터가 떴는데 못 봤다'
   // 하나뿐이라, 눈에 띄는 쪽으로 기울인다.
   anchor: 'center',
+  // 커서보다 주 모니터가 예측 가능하다. 마우스는 엉뚱한 곳에 세워 두기 쉽다.
+  display: 'primary',
   thresholds: [...DEFAULT_THRESHOLDS],
   pollIntervalSec: 60,
   corner: 'top-left',
@@ -126,6 +148,13 @@ function isAnchor(value: unknown): value is Anchor {
   return typeof value === 'string' && (ANCHORS as string[]).includes(value);
 }
 
+function toDisplayChoice(value: unknown): DisplayChoice {
+  if (value === 'cursor' || value === 'primary') return value;
+  // 모니터 id는 숫자다. 설정 파일에 문자열로 들어 있어도 받아 준다.
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isInteger(n) && n >= 0 ? n : DEFAULT_SETTINGS.display;
+}
+
 /** 무엇이 들어오든 쓸 수 있는 설정으로 만든다. 절대 던지지 않는다. */
 export function normalizeSettings(raw: unknown): Settings {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
@@ -135,6 +164,7 @@ export function normalizeSettings(raw: unknown): Settings {
 
   return {
     anchor: isAnchor(o['anchor']) ? o['anchor'] : DEFAULT_SETTINGS.anchor,
+    display: toDisplayChoice(o['display']),
     thresholds: normalizeThresholds(o['thresholds']),
     pollIntervalSec: num(o['pollIntervalSec'], DEFAULT_SETTINGS.pollIntervalSec, MIN_POLL_SEC, MAX_POLL_SEC),
     corner: isCorner(o['corner']) ? o['corner'] : DEFAULT_SETTINGS.corner,

@@ -1,6 +1,6 @@
-import { BrowserWindow, ipcMain, shell } from 'electron';
+import { BrowserWindow, ipcMain, screen, shell } from 'electron';
 import { join } from 'node:path';
-import { SETTINGS_IPC, type AppStatus } from '../shared/settings-ipc.js';
+import { SETTINGS_IPC, type AppStatus, type DisplayInfo } from '../shared/settings-ipc.js';
 import { hooksInstalled, installHooks, uninstallHooks } from '../hooks/install.js';
 import { claudeSettingsPath } from '../shared/runtime-paths.js';
 import { logDir, logPath } from './logger.js';
@@ -80,6 +80,7 @@ function wire(deps: SettingsWindowDeps): void {
   });
 
   ipcMain.handle(SETTINGS_IPC.status, async (): Promise<AppStatus> => ({
+    displays: listDisplays(),
     hooksInstalled: await hooksInstalled(),
     settingsPath: claudeSettingsPath(),
     logPath: logPath(),
@@ -126,6 +127,27 @@ export function openSettings(deps: SettingsWindowDeps): void {
     return;
   }
   win = createWindow(deps);
+}
+
+/**
+ * 고를 수 있는 모니터 목록.
+ *
+ * 사람이 알아볼 수 있는 이름을 붙인다 — id만 보여주면 어느 것이 어느
+ * 화면인지 알 수 없다. 방향과 해상도면 대개 충분하다.
+ */
+function listDisplays(): DisplayInfo[] {
+  const primaryId = screen.getPrimaryDisplay().id;
+  const cursorId = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).id;
+
+  return screen.getAllDisplays().map((d) => {
+    const orientation = d.bounds.height > d.bounds.width ? '세로' : '가로';
+    return {
+      id: d.id,
+      label: `${orientation} ${d.bounds.width}×${d.bounds.height}`,
+      primary: d.id === primaryId,
+      hasCursor: d.id === cursorId,
+    };
+  });
 }
 
 /** 개발 서버가 있으면 그쪽, 없으면 빌드된 파일. */

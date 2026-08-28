@@ -17,8 +17,18 @@ export const SETTINGS_IPC = {
   preview: 'settings:preview',
 } as const;
 
+/** 설정 화면에서 고를 수 있는 모니터. */
+export interface DisplayInfo {
+  id: number;
+  label: string;
+  primary: boolean;
+  /** 지금 커서가 이 화면에 있는지. */
+  hasCursor: boolean;
+}
+
 /** 설정 화면에 함께 보여줄 상태. 설정만으로는 알 수 없는 것들이다. */
 export interface AppStatus {
+  displays: DisplayInfo[];
   hooksInstalled: boolean;
   settingsPath: string;
   logPath: string;

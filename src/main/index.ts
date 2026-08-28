@@ -58,7 +58,7 @@ function placement(anchorRect?: OverlayPlacement['anchorRect']): OverlayPlacemen
   return {
     corner: s.corner,
     margin: s.margin,
-    display: 'cursor',
+    display: s.display,
     size: overlaySizeFor(s.anchor),
     center: s.anchor === 'center',
     ...(anchorRect ? { anchorRect } : {}),
@@ -212,7 +212,12 @@ function onSettingsChanged(next: Settings, prev: Settings): void {
     controller?.setPolicy(holdPolicy());
   }
 
-  if (next.corner !== prev.corner || next.margin !== prev.margin || next.anchor !== prev.anchor) {
+  if (
+    next.corner !== prev.corner ||
+    next.margin !== prev.margin ||
+    next.anchor !== prev.anchor ||
+    next.display !== prev.display
+  ) {
     if (overlayWin) void applyPlacement();
   }
 

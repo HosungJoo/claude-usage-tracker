@@ -37,6 +37,8 @@ const els = {
   interval: $<HTMLInputElement>('interval'),
   intervalOut: $<HTMLOutputElement>('interval-out'),
   character: $<HTMLInputElement>('character'),
+  display: $<HTMLSelectElement>('display'),
+  displayHint: $<HTMLParagraphElement>('display-hint'),
   anchor: $<HTMLSelectElement>('anchor'),
   anchorHint: $<HTMLParagraphElement>('anchor-hint'),
   corner: $<HTMLSelectElement>('corner'),
@@ -78,6 +80,11 @@ function render(settings: Settings): void {
   els.interval.value = String(settings.pollIntervalSec);
   els.intervalOut.textContent = formatSeconds(settings.pollIntervalSec);
   els.character.checked = settings.characterEnabled;
+  els.display.value = String(settings.display);
+  els.displayHint.textContent =
+    settings.display === 'cursor'
+      ? 'Wayland에서는 마우스 위치를 알 수 없어 엉뚱한 화면에 뜰 수 있습니다.'
+      : '항상 같은 화면에 뜹니다.';
   els.anchor.value = settings.anchor;
   els.anchorHint.textContent =
     settings.anchor === 'window'
@@ -107,8 +114,35 @@ function renderHookState(installed: boolean): void {
   els.hookToggle.classList.toggle('ghost', installed);
 }
 
+/** 모니터 목록을 채운다. 앱이 뜬 뒤 모니터가 바뀔 수 있으므로 매번 다시 만든다. */
+function renderDisplays(status: Awaited<ReturnType<typeof window.settings.status>>, selected: string): void {
+  els.display.replaceChildren();
+
+  const fixed: Array<[string, string]> = [
+    ['primary', '주 모니터'],
+    ['cursor', '커서가 있는 화면'],
+  ];
+  for (const [value, label] of fixed) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    els.display.append(opt);
+  }
+
+  for (const d of status.displays) {
+    const opt = document.createElement('option');
+    opt.value = String(d.id);
+    const tags = [d.primary ? '주' : '', d.hasCursor ? '커서 있음' : ''].filter(Boolean);
+    opt.textContent = `${d.label}${tags.length ? ` · ${tags.join(' · ')}` : ''}`;
+    els.display.append(opt);
+  }
+
+  els.display.value = selected;
+}
+
 async function refreshStatus(): Promise<void> {
   const status = await window.settings.status();
+  renderDisplays(status, String((await window.settings.read()).display));
   renderHookState(status.hooksInstalled);
 
   const plan = status.subscription ? `${status.subscription} 플랜` : '플랜 정보 없음';
@@ -156,6 +190,10 @@ els.margin.addEventListener('change', () => void save({ margin: Number(els.margi
 els.character.addEventListener('change', () =>
   void save({ characterEnabled: els.character.checked }),
 );
+els.display.addEventListener('change', () => {
+  const v = els.display.value;
+  void save({ display: v === 'cursor' || v === 'primary' ? v : Number(v) });
+});
 els.anchor.addEventListener('change', () =>
   void save({ anchor: els.anchor.value as Settings['anchor'] }),
 );
