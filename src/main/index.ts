@@ -82,6 +82,10 @@ async function applyPlacement(cwd: string | null = null): Promise<void> {
     }
   }
   repositionOverlay(overlayWin, placement(anchorRect));
+
+  const b = overlayWin.getBounds();
+  const where = anchorRect ? `창 기준 ${store.value.corner}` : `화면 기준 ${store.value.corner}`;
+  logger.info(`배치 — ${where} → (${b.x}, ${b.y}) ${b.width}×${b.height}`);
 }
 
 /** 설정의 표시 시간 배율을 대사에 적용한다. */
@@ -101,7 +105,12 @@ function present(
   // 자리를 먼저 잡고 띄운다. 순서가 바뀌면 캐릭터가 옛 자리에서 한 번
   // 깜박였다가 옮겨 간다.
   void applyPlacement(cwd).then(() => {
-    controller?.enqueue(scaled(line), severity, snapshot ? gaugesFromSnapshot(snapshot) : []);
+    controller?.enqueue(
+      scaled(line),
+      severity,
+      snapshot ? gaugesFromSnapshot(snapshot) : [],
+      store.value.corner,
+    );
   });
 }
 
@@ -123,12 +132,6 @@ function createOverlay(): void {
       console.log(`[renderer:${level}] ${message}`);
     });
   }
-
-  overlayWin.webContents.on('did-finish-load', () => {
-    void overlayWin?.webContents.executeJavaScript(
-      `document.body.dataset.align = ${JSON.stringify(store.value.corner)};`,
-    );
-  });
 
   controller = new OverlayController(overlayWin);
 
@@ -192,12 +195,7 @@ function onSettingsChanged(next: Settings, prev: Settings): void {
   }
 
   if (next.corner !== prev.corner || next.margin !== prev.margin || next.anchor !== prev.anchor) {
-    if (overlayWin) {
-      void applyPlacement();
-      void overlayWin.webContents.executeJavaScript(
-        `document.body.dataset.align = ${JSON.stringify(next.corner)};`,
-      );
-    }
+    if (overlayWin) void applyPlacement();
   }
 
   if (next.autostart !== prev.autostart) {
@@ -342,7 +340,7 @@ function demoScenes(): DemoScene[] {
 function runDemo(): void {
   demoScenes().forEach((scene, i) => {
     setTimeout(() => {
-      controller?.enqueue(scene.line, scene.severity, scene.gauges);
+      controller?.enqueue(scene.line, scene.severity, scene.gauges, store.value.corner);
     }, i * 8000);
   });
 }
@@ -359,7 +357,7 @@ async function captureDemo(dir: string): Promise<void> {
   for (const [i, scene] of demoScenes().entries()) {
     controller?.clear();
     await new Promise((r) => setTimeout(r, 120));
-    controller?.enqueue(scene.line, scene.severity, scene.gauges);
+    controller?.enqueue(scene.line, scene.severity, scene.gauges, store.value.corner);
     await new Promise((r) => setTimeout(r, 1400));
 
     if (!overlayWin || overlayWin.isDestroyed()) break;

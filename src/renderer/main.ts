@@ -92,9 +92,21 @@ function hide(notify: boolean): void {
   currentId = -1;
 }
 
+/**
+ * 창이 붙은 모서리에 맞춰 캐릭터와 말풍선의 배치를 바꾼다.
+ *
+ * 화면 위쪽에 붙으면 말풍선이 캐릭터 아래로 가야 하고, 왼쪽에 붙으면
+ * 꼬리가 왼쪽을 향해야 한다. 그러지 않으면 말풍선이 화면 밖을 가리킨다.
+ */
+function applyAlignment(corner: string): void {
+  stage.classList.toggle('align-left', corner.endsWith('left'));
+  stage.classList.toggle('align-top', corner.startsWith('top'));
+}
+
 function show(req: ShowRequest): void {
   clearHideTimer();
   currentId = req.id;
+  applyAlignment(req.corner);
 
   titleEl.textContent = req.line.title;
   detailEl.textContent = req.line.detail;
@@ -120,12 +132,6 @@ bubble.addEventListener('click', () => hide(true));
 
 window.overlay.onShow(show);
 window.overlay.onHide(() => hide(false));
-
-// 창 크기로 어느 코너에 붙었는지 추론할 수 없으므로, 메인이 body의
-// data 속성으로 알려준다.
-const align = document.body.dataset['align'];
-if (align?.includes('left')) stage.classList.add('align-left');
-if (align?.includes('top')) stage.classList.add('align-top');
 
 draw();
 requestAnimationFrame(loop);

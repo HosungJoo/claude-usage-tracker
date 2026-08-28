@@ -3,6 +3,7 @@ import { ipcMain } from 'electron';
 import { cancelReassert, showOverlay } from './overlay-window.js';
 import type { Line } from '../shared/character/script.js';
 import { IPC, type GaugeInfo, type ShowRequest } from '../shared/ipc.js';
+import type { Corner } from './overlay-window.js';
 import type { Severity } from '../core/types.js';
 
 /**
@@ -17,6 +18,7 @@ interface QueueItem {
   line: Line;
   severity: Severity;
   gauges: GaugeInfo[];
+  corner: Corner;
   priority: number;
 }
 
@@ -77,12 +79,13 @@ export class OverlayController {
    * 캐릭터를 띄운다. 이미 무언가 보여주는 중이면 큐에 넣는다.
    * @returns 이 요청의 id.
    */
-  enqueue(line: Line, severity: Severity, gauges: GaugeInfo[]): number {
+  enqueue(line: Line, severity: Severity, gauges: GaugeInfo[], corner: Corner): number {
     const item: QueueItem = {
       id: this.nextId++,
       line,
       severity,
       gauges,
+      corner,
       priority: SEVERITY_PRIORITY[severity],
     };
 
@@ -129,6 +132,7 @@ export class OverlayController {
       line: next.line,
       severity: next.severity,
       gauges: next.gauges,
+      corner: next.corner,
     };
 
     // 포커스를 훔치지 않고 띄우되, 뜬 뒤에 항상-위를 다시 건다.

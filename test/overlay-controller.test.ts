@@ -101,9 +101,15 @@ beforeEach(() => {
 });
 
 describe('OverlayController', () => {
+  it('붙은 모서리를 함께 보낸다 — 렌더러가 말풍선 방향을 정한다', () => {
+    const c = make();
+    c.enqueue(line('x'), 'normal', [], 'top-left');
+    expect((sent[0]?.payload as { corner: string }).corner).toBe('top-left');
+  });
+
   it('요청을 렌더러로 보내고 창을 띄운다', () => {
     const c = make();
-    c.enqueue(line('안녕'), 'normal', []);
+    c.enqueue(line('안녕'), 'normal', [], 'bottom-right');
     expect(calls.show).toBe(1);
     expect(sent[0]?.channel).toBe(IPC.show);
   });
@@ -112,7 +118,7 @@ describe('OverlayController', () => {
     // showInactive만 쓰고 show는 쓰지 않는다 — fakeWin에 show가 없으므로
     // 잘못 부르면 여기서 터진다.
     const c = make();
-    expect(() => c.enqueue(line('x'), 'normal', [])).not.toThrow();
+    expect(() => c.enqueue(line('x'), 'normal', [], 'bottom-right')).not.toThrow();
     expect(calls.show).toBe(1);
   });
 
@@ -120,7 +126,7 @@ describe('OverlayController', () => {
     // 리눅스에서 show는 항상-위 설정을 비동기로 지운다. 한 번만 걸면
     // 캐릭터가 다른 창 뒤로 갈 수 있다.
     const c = make();
-    c.enqueue(line('x'), 'normal', []);
+    c.enqueue(line('x'), 'normal', [], 'bottom-right');
     const immediate = calls.alwaysOnTop.length;
     expect(immediate).toBeGreaterThan(0);
 
@@ -131,7 +137,7 @@ describe('OverlayController', () => {
   it('렌더러가 아직 로딩 중이면 보내지 않고 기다린다', () => {
     loading = true;
     const c = make();
-    c.enqueue(line('먼저 온 알림'), 'normal', []);
+    c.enqueue(line('먼저 온 알림'), 'normal', [], 'bottom-right');
     expect(sent).toHaveLength(0);
 
     fireWc('did-finish-load');
@@ -141,8 +147,8 @@ describe('OverlayController', () => {
 
   it('표시 중이면 큐에 쌓고 하나씩 보여준다', () => {
     const c = make();
-    const first = c.enqueue(line('첫번째'), 'normal', []);
-    c.enqueue(line('두번째'), 'normal', []);
+    const first = c.enqueue(line('첫번째'), 'normal', [], 'bottom-right');
+    c.enqueue(line('두번째'), 'normal', [], 'bottom-right');
     expect(sent).toHaveLength(1);
 
     dismiss(first);
@@ -153,9 +159,9 @@ describe('OverlayController', () => {
 
   it('더 심각한 알림이 큐에서 앞으로 온다', () => {
     const c = make();
-    const first = c.enqueue(line('보여주는 중'), 'normal', []);
-    c.enqueue(line('가벼움'), 'normal', []);
-    c.enqueue(line('위험'), 'critical', []);
+    const first = c.enqueue(line('보여주는 중'), 'normal', [], 'bottom-right');
+    c.enqueue(line('가벼움'), 'normal', [], 'bottom-right');
+    c.enqueue(line('위험'), 'critical', [], 'bottom-right');
 
     dismiss(first);
     vi.advanceTimersByTime(1000);
@@ -164,9 +170,9 @@ describe('OverlayController', () => {
 
   it('같은 심각도끼리는 들어온 순서를 지킨다', () => {
     const c = make();
-    const first = c.enqueue(line('보여주는 중'), 'normal', []);
-    c.enqueue(line('A'), 'warning', []);
-    c.enqueue(line('B'), 'warning', []);
+    const first = c.enqueue(line('보여주는 중'), 'normal', [], 'bottom-right');
+    c.enqueue(line('A'), 'warning', [], 'bottom-right');
+    c.enqueue(line('B'), 'warning', [], 'bottom-right');
 
     dismiss(first);
     vi.advanceTimersByTime(1000);
@@ -175,15 +181,15 @@ describe('OverlayController', () => {
 
   it('닫히면 창을 숨긴다', () => {
     const c = make();
-    const id = c.enqueue(line('x'), 'normal', []);
+    const id = c.enqueue(line('x'), 'normal', [], 'bottom-right');
     dismiss(id);
     expect(calls.hide).toBe(1);
   });
 
   it('렌더러가 응답하지 않아도 큐가 막히지 않는다', () => {
     const c = make();
-    c.enqueue(line('응답 없음', 3000), 'normal', []);
-    c.enqueue(line('다음'), 'normal', []);
+    c.enqueue(line('응답 없음', 3000), 'normal', [], 'bottom-right');
+    c.enqueue(line('다음'), 'normal', [], 'bottom-right');
 
     // holdMs + 안전망 2초 + 간격
     vi.advanceTimersByTime(3000 + 2000 + 1000);
@@ -192,15 +198,15 @@ describe('OverlayController', () => {
 
   it('모르는 id의 dismiss는 무시한다', () => {
     const c = make();
-    c.enqueue(line('x'), 'normal', []);
+    c.enqueue(line('x'), 'normal', [], 'bottom-right');
     dismiss(9999);
     expect(calls.hide).toBe(0);
   });
 
   it('clear는 큐를 비우고 창을 감춘다', () => {
     const c = make();
-    c.enqueue(line('a'), 'normal', []);
-    c.enqueue(line('b'), 'normal', []);
+    c.enqueue(line('a'), 'normal', [], 'bottom-right');
+    c.enqueue(line('b'), 'normal', [], 'bottom-right');
     c.clear();
 
     expect(sent.some((s) => s.channel === IPC.hide)).toBe(true);
@@ -219,6 +225,6 @@ describe('OverlayController', () => {
 
   it('id는 요청마다 새로 발급된다', () => {
     const c = make();
-    expect(c.enqueue(line('a'), 'normal', [])).not.toBe(c.enqueue(line('b'), 'normal', []));
+    expect(c.enqueue(line('a'), 'normal', [], 'bottom-right')).not.toBe(c.enqueue(line('b'), 'normal', [], 'bottom-right'));
   });
 });

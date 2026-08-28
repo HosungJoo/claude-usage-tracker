@@ -1,4 +1,5 @@
 import type { Line } from './character/script.js';
+import type { Corner } from '../main/overlay-window.js';
 import type { Severity, UsageSnapshot } from '../core/types.js';
 
 /** 메인 → 렌더러로 보내는 '이 내용으로 등장해라' 지시. */
@@ -6,6 +7,15 @@ export interface ShowRequest {
   id: number;
   line: Line;
   severity: Severity;
+  /**
+   * 창이 화면 어느 모서리에 붙어 있는지.
+   *
+   * 렌더러는 이 값으로 캐릭터와 말풍선의 앞뒤·좌우를 정한다. 창 밖으로
+   * 말풍선 꼬리가 향하면 안 되기 때문이다. 등장할 때마다 함께 보내는
+   * 이유는, 창이 뜬 뒤에 DOM 속성으로 알려주면 렌더러가 그것을 읽는
+   * 시점보다 늦게 도착하기 때문이다.
+   */
+  corner: Corner;
   /** 게이지 표시용. 없으면 게이지를 그리지 않는다. */
   gauges: GaugeInfo[];
 }
