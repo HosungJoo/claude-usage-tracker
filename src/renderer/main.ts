@@ -32,7 +32,6 @@ const animator = new CharacterAnimator();
 const imageData = paint.createImageData(SPRITE_W, SPRITE_H);
 
 let lastFrameTime = performance.now();
-let hideTimer: number | null = null;
 let currentId = -1;
 
 /** 캔버스에 현재 프레임을 찍는다. */
@@ -77,15 +76,7 @@ function renderGauges(gauges: GaugeInfo[]): void {
   }
 }
 
-function clearHideTimer(): void {
-  if (hideTimer !== null) {
-    clearTimeout(hideTimer);
-    hideTimer = null;
-  }
-}
-
 function hide(notify: boolean): void {
-  clearHideTimer();
   stage.classList.remove('visible', 'entering');
   window.overlay.setInteractive(false);
   if (notify && currentId >= 0) window.overlay.dismissed(currentId);
@@ -98,15 +89,17 @@ function hide(notify: boolean): void {
  * 화면 위쪽에 붙으면 말풍선이 캐릭터 아래로 가야 하고, 왼쪽에 붙으면
  * 꼬리가 왼쪽을 향해야 한다. 그러지 않으면 말풍선이 화면 밖을 가리킨다.
  */
-function applyAlignment(corner: string): void {
-  stage.classList.toggle('align-left', corner.endsWith('left'));
-  stage.classList.toggle('align-top', corner.startsWith('top'));
+function applyAlignment(req: ShowRequest): void {
+  // 한가운데 모드는 모서리와 무관하다. 캐릭터가 위, 말풍선이 그 아래 가운데.
+  stage.classList.toggle('centered', req.centered);
+  stage.classList.toggle('large', req.size === 'large');
+  stage.classList.toggle('align-left', !req.centered && req.corner.endsWith('left'));
+  stage.classList.toggle('align-top', !req.centered && req.corner.startsWith('top'));
 }
 
 function show(req: ShowRequest): void {
-  clearHideTimer();
   currentId = req.id;
-  applyAlignment(req.corner);
+  applyAlignment(req);
 
   titleEl.textContent = req.line.title;
   detailEl.textContent = req.line.detail;
@@ -122,7 +115,8 @@ function show(req: ShowRequest): void {
   void stage.offsetWidth;
   stage.classList.add('visible', 'entering');
 
-  hideTimer = window.setTimeout(() => hide(true), req.line.holdMs);
+  // 여기서 타이머를 걸지 않는다. 언제 치울지는 메인이 사용자의 재실을
+  // 보고 정한다 — 자리를 비운 사이에 조용히 사라지면 알림이 없던 것과 같다.
 }
 
 // 말풍선 위에서만 클릭을 받는다. 그 외에는 창 전체가 클릭을 통과시킨다.

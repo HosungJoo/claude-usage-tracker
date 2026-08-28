@@ -218,6 +218,84 @@ body {
   border-top: 3px solid var(--paper-edge);
 }
 
+/* ---------- 한가운데 · 크게 ---------- */
+
+/*
+ * 이 모드의 목적은 하나다: 놓치지 않게 하는 것. 그래서 캐릭터를 키우고
+ * 말풍선 글자도 함께 키운다. 작은 모드의 값을 그대로 확대하면 여백만
+ * 늘어나 허전해 보이므로, 배율은 요소마다 따로 잡았다.
+ */
+.stage.centered {
+  align-items: center;
+  justify-content: center;
+  flex-direction: column-reverse;
+  gap: 14px;
+}
+
+.stage.large {
+  --pixel: 14px;
+}
+
+.stage.large .bubble {
+  max-width: 660px;
+}
+
+.stage.large .bubble-body {
+  border-width: 5px;
+  border-radius: 3px;
+  box-shadow: 7px 7px 0 rgb(74 44 32 / 35%);
+  padding: 20px 26px;
+}
+
+.stage.large .title {
+  font-size: 27px;
+  line-height: 1.3;
+}
+
+.stage.large .detail {
+  margin-top: 6px;
+  font-size: 17px;
+}
+
+.stage.large .gauges {
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.stage.large .gauge {
+  grid-template-columns: 62px 1fr 68px;
+  gap: 12px;
+}
+
+.stage.large .gauge-label { font-size: 15px; }
+.stage.large .gauge-value { font-size: 16px; }
+
+.stage.large .gauge-track {
+  height: 15px;
+  border-width: 3px;
+}
+
+/* 한가운데 모드에서는 말풍선이 캐릭터 아래에 오므로 꼬리가 위를 향한다. */
+.stage.centered .bubble-tail {
+  right: auto;
+  left: 50%;
+  top: -9px;
+  bottom: auto;
+  margin-left: -6px;
+  border: none;
+  border-left: 3px solid var(--paper-edge);
+  border-top: 3px solid var(--paper-edge);
+}
+
+.stage.large.centered .bubble-tail {
+  width: 18px;
+  height: 18px;
+  top: -12px;
+  margin-left: -9px;
+  border-left-width: 5px;
+  border-top-width: 5px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .character,
   .bubble {

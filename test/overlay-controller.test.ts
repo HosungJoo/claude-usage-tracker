@@ -63,6 +63,7 @@ vi.mock('electron', () => ({
     on: (channel: string, fn: (e: unknown, ...a: never[]) => void) => ipcHandlers.set(channel, fn),
     off: (channel: string) => ipcHandlers.delete(channel),
   },
+  powerMonitor: { getSystemIdleTime: () => 0, getSystemIdleState: () => 'active' },
 }));
 
 const { OverlayController } = await import('../src/main/overlay-controller.js');
@@ -72,8 +73,15 @@ function line(title: string, holdMs = 5000): Line {
   return { expression: 'talk', title, detail: '', holdMs };
 }
 
-function make(): InstanceType<typeof OverlayController> {
-  return new OverlayController(fakeWin as never);
+/** 재실 판정을 테스트가 조종한다. */
+let present = true;
+
+function make(waitWhenAway = false, presentMs = 3000): InstanceType<typeof OverlayController> {
+  return new OverlayController(fakeWin as never, {
+    presentMs,
+    waitWhenAway,
+    isPresent: () => Promise.resolve(present),
+  });
 }
 
 /** 렌더러가 dismissed를 보낸 것처럼 흉내 낸다. */
@@ -98,6 +106,7 @@ beforeEach(() => {
   calls.alwaysOnTop.length = 0;
   loading = false;
   visible = false;
+  present = true;
 });
 
 describe('OverlayController', () => {
@@ -187,12 +196,12 @@ describe('OverlayController', () => {
   });
 
   it('렌더러가 응답하지 않아도 큐가 막히지 않는다', () => {
+    // 메인이 스스로 시간을 재므로 렌더러의 응답을 기다리지 않는다.
     const c = make();
-    c.enqueue(line('응답 없음', 3000), 'normal', [], 'bottom-right');
+    c.enqueue(line('응답 없음'), 'normal', [], 'bottom-right');
     c.enqueue(line('다음'), 'normal', [], 'bottom-right');
 
-    // holdMs + 안전망 2초 + 간격
-    vi.advanceTimersByTime(3000 + 2000 + 1000);
+    vi.advanceTimersByTime(3000 + 1000);
     expect(sent).toHaveLength(2);
   });
 
@@ -226,5 +235,85 @@ describe('OverlayController', () => {
   it('id는 요청마다 새로 발급된다', () => {
     const c = make();
     expect(c.enqueue(line('a'), 'normal', [], 'bottom-right')).not.toBe(c.enqueue(line('b'), 'normal', [], 'bottom-right'));
+  });
+});
+
+describe('사람이 볼 때까지 기다린다', () => {
+  /** 재실 판정이 프로미스라 타이머를 밀 때마다 마이크로태스크를 흘려줘야 한다. */
+  async function advance(ms: number, step = 200): Promise<void> {
+    for (let t = 0; t < ms; t += step) {
+      vi.advanceTimersByTime(step);
+      await Promise.resolve();
+      await Promise.resolve();
+    }
+  }
+
+  it('자리에 있으면 정해진 시간 뒤 사라진다', async () => {
+    present = true;
+    const c = make(true, 3000);
+    c.enqueue(line('x'), 'normal', [], 'bottom-right');
+
+    await advance(2000);
+    expect(calls.hide).toBe(0);
+
+    await advance(1500);
+    expect(calls.hide).toBe(1);
+  });
+
+  it('자리에 없으면 사라지지 않는다', async () => {
+    present = false;
+    const c = make(true, 3000);
+    c.enqueue(line('x'), 'normal', [], 'bottom-right');
+
+    // 못 보는 알림은 없는 알림이다. 30초가 지나도 그대로 떠 있어야 한다.
+    await advance(30_000);
+    expect(calls.hide).toBe(0);
+  });
+
+  it('돌아오면 그때부터 시간을 잰다', async () => {
+    present = false;
+    const c = make(true, 3000);
+    c.enqueue(line('x'), 'normal', [], 'bottom-right');
+
+    await advance(10_000);
+    expect(calls.hide).toBe(0);
+
+    present = true;
+    await advance(1500);
+    expect(calls.hide).toBe(0);
+
+    await advance(2500);
+    expect(calls.hide).toBe(1);
+  });
+
+  it('기다리기를 끄면 재실과 무관하게 사라진다', async () => {
+    present = false;
+    const c = make(false, 3000);
+    c.enqueue(line('x'), 'normal', [], 'bottom-right');
+
+    await advance(3500);
+    expect(calls.hide).toBe(1);
+  });
+
+  it('아무리 기다려도 30분을 넘기지 않는다', async () => {
+    // 재실 감지가 계속 '없음'을 돌려주면 캐릭터가 영원히 남는다.
+    present = false;
+    const c = make(true, 3000);
+    c.enqueue(line('x'), 'normal', [], 'bottom-right');
+
+    await advance(31 * 60_000, 5_000);
+    expect(calls.hide).toBe(1);
+  });
+
+  it('설정을 바꾸면 다음 표시부터 적용된다', async () => {
+    present = true;
+    const c = make(true, 3000);
+    c.setPolicy({ presentMs: 10_000, waitWhenAway: true, isPresent: () => Promise.resolve(true) });
+    c.enqueue(line('x'), 'normal', [], 'bottom-right');
+
+    await advance(5000);
+    expect(calls.hide).toBe(0);
+    await advance(6000);
+    expect(calls.hide).toBe(1);
   });
 });

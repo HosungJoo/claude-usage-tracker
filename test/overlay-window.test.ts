@@ -31,9 +31,8 @@ vi.mock('electron', () => ({
   BrowserWindow: class {},
 }));
 
-const { computeBounds, DEFAULT_PLACEMENT, OVERLAY_WIDTH, OVERLAY_HEIGHT } = await import(
-  '../src/main/overlay-window.js'
-);
+const { computeBounds, DEFAULT_PLACEMENT, OVERLAY_DIMENSIONS, OVERLAY_WIDTH, OVERLAY_HEIGHT, overlaySizeFor } =
+  await import('../src/main/overlay-window.js');
 
 beforeEach(() => {
   nearestDisplay = displays.primary;
@@ -84,6 +83,35 @@ describe('computeBounds', () => {
     nearestDisplay = displays.secondary;
     const b = computeBounds({ ...DEFAULT_PLACEMENT, display: 'primary' });
     expect(b.x).toBe(1920 - OVERLAY_WIDTH - 24);
+  });
+
+  it('한가운데 모드는 화면 중앙에 놓는다', () => {
+    const { width, height } = OVERLAY_DIMENSIONS.large;
+    const b = computeBounds({ ...DEFAULT_PLACEMENT, center: true, size: 'large' });
+    expect(b.width).toBe(width);
+    expect(b.height).toBe(height);
+    expect(b.x).toBe(Math.round((1920 - width) / 2));
+    expect(b.y).toBe(Math.round((1040 - height) / 2));
+  });
+
+  it('한가운데 모드는 모서리 설정을 무시한다', () => {
+    const a = computeBounds({ ...DEFAULT_PLACEMENT, center: true, size: 'large', corner: 'top-left' });
+    const b = computeBounds({ ...DEFAULT_PLACEMENT, center: true, size: 'large', corner: 'bottom-right' });
+    expect(a).toEqual(b);
+  });
+
+  it('큰 창도 화면 밖으로 나가지 않는다', () => {
+    const b = computeBounds({ ...DEFAULT_PLACEMENT, size: 'large', margin: 0, corner: 'top-left' });
+    expect(b.x).toBeGreaterThanOrEqual(0);
+    expect(b.y).toBeGreaterThanOrEqual(0);
+    expect(b.x + b.width).toBeLessThanOrEqual(1920);
+    expect(b.y + b.height).toBeLessThanOrEqual(1040);
+  });
+
+  it('한가운데 모드는 큰 창을 쓴다', () => {
+    expect(overlaySizeFor('center')).toBe('large');
+    expect(overlaySizeFor('screen')).toBe('compact');
+    expect(overlaySizeFor('window')).toBe('compact');
   });
 
   it('여백을 키우면 안쪽으로 들어온다', () => {

@@ -53,11 +53,22 @@ describe('normalizeSettings', () => {
     expect(normalizeSettings({ pollIntervalSec: 99_999 }).pollIntervalSec).toBe(MAX_POLL_SEC);
   });
 
-  it('여백과 표시 배율도 가둔다', () => {
+  it('여백과 표시 시간을 범위 안으로 가둔다', () => {
     expect(normalizeSettings({ margin: -50 }).margin).toBe(0);
     expect(normalizeSettings({ margin: 9999 }).margin).toBe(200);
-    expect(normalizeSettings({ holdScale: 0.1 }).holdScale).toBe(0.5);
-    expect(normalizeSettings({ holdScale: 99 }).holdScale).toBe(3);
+    expect(normalizeSettings({ holdSec: 0 }).holdSec).toBe(1);
+    expect(normalizeSettings({ holdSec: 999 }).holdSec).toBe(30);
+  });
+
+  it('옛 설정에 남은 holdScale은 조용히 버린다', () => {
+    const s = normalizeSettings({ holdScale: 2, holdSec: 5 });
+    expect(s.holdSec).toBe(5);
+    expect('holdScale' in s).toBe(false);
+  });
+
+  it('기다리기 설정을 읽는다', () => {
+    expect(normalizeSettings({ waitWhenAway: false }).waitWhenAway).toBe(false);
+    expect(normalizeSettings({}).waitWhenAway).toBe(true);
   });
 
   it('모르는 모서리 값은 기본값으로', () => {

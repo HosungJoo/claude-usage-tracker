@@ -12,15 +12,16 @@ import type { Corner } from '../main/overlay-window.js';
 /**
  * 캐릭터를 어디에 띄울지.
  *
- * 'screen'  화면 모서리 — 항상 같은 자리라 예측 가능하다.
- * 'window'  작업 중인 창의 모서리 — 보고 있는 곳 가까이에 뜬다.
- *           창을 찾지 못하면(네이티브 Wayland 앱 등) 화면 모서리로 물러난다.
+ * 'center'  커서가 있는 화면 한가운데에 크게 — 놓치기 어렵다.
+ * 'screen'  화면 모서리 — 작게, 방해가 덜하다.
+ * 'window'  작업 중인 창의 모서리. 창을 찾지 못하면 화면 모서리로 물러난다.
  */
-export type Anchor = 'screen' | 'window';
+export type Anchor = 'center' | 'screen' | 'window';
 
-export const ANCHORS: Anchor[] = ['screen', 'window'];
+export const ANCHORS: Anchor[] = ['center', 'screen', 'window'];
 
 export const ANCHOR_LABEL: Record<Anchor, string> = {
+  center: '화면 한가운데 (크게)',
   screen: '화면 모서리',
   window: '작업 중인 창',
 };
@@ -36,8 +37,15 @@ export interface Settings {
   corner: Corner;
   /** 화면 가장자리로부터의 여백(px). */
   margin: number;
-  /** 말풍선이 머무는 시간 배율. 1이 기본. */
-  holdScale: number;
+  /**
+   * 사용자가 자리에 있을 때 말풍선이 머무는 시간(초).
+   *
+   * 자리에 없으면 이 값과 상관없이 돌아올 때까지 기다린다 — 못 보는
+   * 알림은 없는 알림이다.
+   */
+  holdSec: number;
+  /** 자리를 비웠으면 돌아올 때까지 기다릴지. */
+  waitWhenAway: boolean;
   /** 캐릭터를 띄울지. 끄면 트레이 아이콘만 동작한다. */
   characterEnabled: boolean;
   /** 세션 시작 시 인사할지. */
@@ -47,15 +55,15 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  // 화면 기준이 기본이다. 창 기준은 X11 창(XWayland로 뜬 편집기·터미널)에서만
-  // 동작하는데, 요즘 리눅스 데스크톱의 터미널은 대개 네이티브 Wayland 창이라
-  // 위치를 물어볼 수 없다. 되는 환경에서만 켜서 쓰는 편이 맞다.
-  anchor: 'screen',
+  // 한가운데 크게가 기본이다. 이 앱의 실패 방식은 '캐릭터가 떴는데 못 봤다'
+  // 하나뿐이라, 눈에 띄는 쪽으로 기울인다.
+  anchor: 'center',
   thresholds: [...DEFAULT_THRESHOLDS],
   pollIntervalSec: 60,
   corner: 'top-left',
   margin: 24,
-  holdScale: 1,
+  holdSec: 3,
+  waitWhenAway: true,
   characterEnabled: true,
   greetOnSessionStart: true,
   autostart: false,
@@ -75,8 +83,8 @@ export const MIN_POLL_SEC = 15;
 export const MAX_POLL_SEC = 600;
 export const MIN_MARGIN = 0;
 export const MAX_MARGIN = 200;
-export const MIN_HOLD_SCALE = 0.5;
-export const MAX_HOLD_SCALE = 3;
+export const MIN_HOLD_SEC = 1;
+export const MAX_HOLD_SEC = 30;
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v));
@@ -131,7 +139,8 @@ export function normalizeSettings(raw: unknown): Settings {
     pollIntervalSec: num(o['pollIntervalSec'], DEFAULT_SETTINGS.pollIntervalSec, MIN_POLL_SEC, MAX_POLL_SEC),
     corner: isCorner(o['corner']) ? o['corner'] : DEFAULT_SETTINGS.corner,
     margin: num(o['margin'], DEFAULT_SETTINGS.margin, MIN_MARGIN, MAX_MARGIN),
-    holdScale: num(o['holdScale'], DEFAULT_SETTINGS.holdScale, MIN_HOLD_SCALE, MAX_HOLD_SCALE),
+    holdSec: num(o['holdSec'], DEFAULT_SETTINGS.holdSec, MIN_HOLD_SEC, MAX_HOLD_SEC),
+    waitWhenAway: bool(o['waitWhenAway'], DEFAULT_SETTINGS.waitWhenAway),
     characterEnabled: bool(o['characterEnabled'], DEFAULT_SETTINGS.characterEnabled),
     greetOnSessionStart: bool(o['greetOnSessionStart'], DEFAULT_SETTINGS.greetOnSessionStart),
     autostart: bool(o['autostart'], DEFAULT_SETTINGS.autostart),

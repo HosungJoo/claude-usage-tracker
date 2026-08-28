@@ -1,5 +1,5 @@
 import type { Line } from './character/script.js';
-import type { Corner } from '../main/overlay-window.js';
+import type { Corner, OverlaySize } from '../main/overlay-window.js';
 import type { Severity, UsageSnapshot } from '../core/types.js';
 
 /** 메인 → 렌더러로 보내는 '이 내용으로 등장해라' 지시. */
@@ -16,6 +16,10 @@ export interface ShowRequest {
    * 시점보다 늦게 도착하기 때문이다.
    */
   corner: Corner;
+  /** 창 크기 모드. 렌더러가 글자와 캐릭터 배율을 여기에 맞춘다. */
+  size: OverlaySize;
+  /** 한가운데 모드인지. 말풍선을 캐릭터 아래에 가운데로 놓는다. */
+  centered: boolean;
   /** 게이지 표시용. 없으면 게이지를 그리지 않는다. */
   gauges: GaugeInfo[];
 }

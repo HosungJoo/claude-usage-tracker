@@ -20,6 +20,10 @@ export interface Rect {
 }
 
 export interface OverlayPlacement {
+  /** 창 크기 모드. */
+  size?: OverlaySize;
+  /** 화면(또는 기준 사각형) 한가운데에 놓는다. corner를 무시한다. */
+  center?: boolean;
   corner: Corner;
   /**
    * 이 사각형 안에 배치한다. 작업 중인 창의 좌표를 넣으면 그 창을 기준으로
@@ -43,9 +47,22 @@ export const DEFAULT_PLACEMENT: OverlayPlacement = {
   display: 'cursor',
 };
 
-/** 캐릭터 + 말풍선이 들어가는 창 크기. */
-export const OVERLAY_WIDTH = 380;
-export const OVERLAY_HEIGHT = 250;
+/**
+ * 창 크기. 모드마다 다르다.
+ *
+ * 'large'는 화면 한가운데에 크게 띄우는 모드다. 이 앱의 실패 방식은
+ * '떴는데 못 봤다' 하나뿐이라, 놓치기 어려운 크기를 기본으로 둔다.
+ */
+export type OverlaySize = 'compact' | 'large';
+
+export const OVERLAY_DIMENSIONS: Record<OverlaySize, { width: number; height: number }> = {
+  compact: { width: 380, height: 250 },
+  large: { width: 880, height: 520 },
+};
+
+/** 호환용 — 기본(작은) 크기. */
+export const OVERLAY_WIDTH = OVERLAY_DIMENSIONS.compact.width;
+export const OVERLAY_HEIGHT = OVERLAY_DIMENSIONS.compact.height;
 
 function resolveDisplay(placement: OverlayPlacement): Display {
   // 창을 기준으로 잡을 때는 그 창이 있는 화면을 따라야 한다. 커서가 다른
@@ -79,20 +96,28 @@ function resolveDisplay(placement: OverlayPlacement): Display {
 export function computeBounds(placement: OverlayPlacement): Electron.Rectangle {
   const display = resolveDisplay(placement);
   const base = placement.anchorRect ?? display.workArea;
+  const { width, height } = OVERLAY_DIMENSIONS[placement.size ?? 'compact'];
   const m = placement.margin;
 
-  const left = placement.corner.endsWith('left');
-  const top = placement.corner.startsWith('top');
+  let x: number;
+  let y: number;
+  if (placement.center) {
+    x = base.x + (base.width - width) / 2;
+    y = base.y + (base.height - height) / 2;
+  } else {
+    const left = placement.corner.endsWith('left');
+    const top = placement.corner.startsWith('top');
+    x = left ? base.x + m : base.x + base.width - width - m;
+    y = top ? base.y + m : base.y + base.height - height - m;
+  }
 
-  const x = left ? base.x + m : base.x + base.width - OVERLAY_WIDTH - m;
-  const y = top ? base.y + m : base.y + base.height - OVERLAY_HEIGHT - m;
-
+  // 기준 사각형이 화면 가장자리에 걸쳐 있으면 결과가 화면 밖으로 나갈 수 있다.
   const wa = display.workArea;
   return {
-    x: Math.round(Math.min(Math.max(x, wa.x), wa.x + wa.width - OVERLAY_WIDTH)),
-    y: Math.round(Math.min(Math.max(y, wa.y), wa.y + wa.height - OVERLAY_HEIGHT)),
-    width: OVERLAY_WIDTH,
-    height: OVERLAY_HEIGHT,
+    x: Math.round(Math.min(Math.max(x, wa.x), wa.x + wa.width - width)),
+    y: Math.round(Math.min(Math.max(y, wa.y), wa.y + wa.height - height)),
+    width,
+    height,
   };
 }
 
@@ -204,4 +229,9 @@ export function cancelReassert(win: BrowserWindow): void {
 export function repositionOverlay(win: BrowserWindow, placement: OverlayPlacement): void {
   if (win.isDestroyed()) return;
   win.setBounds(computeBounds(placement));
+}
+
+/** 모드에 맞는 창 크기. */
+export function overlaySizeFor(anchor: string): OverlaySize {
+  return anchor === 'center' ? 'large' : 'compact';
 }

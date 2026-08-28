@@ -21,6 +21,7 @@ import { applyAutostart } from './autostart.js';
 import { findWorkingWindow } from './window-anchor.js';
 import {
   createOverlayWindow,
+  overlaySizeFor,
   repositionOverlay,
   type OverlayPlacement,
 } from './overlay-window.js';
@@ -58,6 +59,8 @@ function placement(anchorRect?: OverlayPlacement['anchorRect']): OverlayPlacemen
     corner: s.corner,
     margin: s.margin,
     display: 'cursor',
+    size: overlaySizeFor(s.anchor),
+    center: s.anchor === 'center',
     ...(anchorRect ? { anchorRect } : {}),
   };
 }
@@ -84,14 +87,14 @@ async function applyPlacement(cwd: string | null = null): Promise<void> {
   repositionOverlay(overlayWin, placement(anchorRect));
 
   const b = overlayWin.getBounds();
-  const where = anchorRect ? `창 기준 ${store.value.corner}` : `화면 기준 ${store.value.corner}`;
+  const s = store.value;
+  const where =
+    s.anchor === 'center'
+      ? '화면 한가운데'
+      : anchorRect
+        ? `창 기준 ${s.corner}`
+        : `화면 기준 ${s.corner}`;
   logger.info(`배치 — ${where} → (${b.x}, ${b.y}) ${b.width}×${b.height}`);
-}
-
-/** 설정의 표시 시간 배율을 대사에 적용한다. */
-function scaled(line: Line): Line {
-  const scale = store.value.holdScale;
-  return scale === 1 ? line : { ...line, holdMs: Math.round(line.holdMs * scale) };
 }
 
 /** 캐릭터를 띄운다. 설정에서 껐으면 아무 일도 하지 않는다. */
@@ -105,11 +108,14 @@ function present(
   // 자리를 먼저 잡고 띄운다. 순서가 바뀌면 캐릭터가 옛 자리에서 한 번
   // 깜박였다가 옮겨 간다.
   void applyPlacement(cwd).then(() => {
+    const s = store.value;
     controller?.enqueue(
-      scaled(line),
+      line,
       severity,
       snapshot ? gaugesFromSnapshot(snapshot) : [],
-      store.value.corner,
+      s.corner,
+      overlaySizeFor(s.anchor),
+      s.anchor === 'center',
     );
   });
 }
@@ -133,13 +139,21 @@ function createOverlay(): void {
     });
   }
 
-  controller = new OverlayController(overlayWin);
+  controller = new OverlayController(overlayWin, holdPolicy(), (m) => logger.info(m));
 
   overlayWin.on('closed', () => {
     controller?.dispose();
     controller = null;
     overlayWin = null;
   });
+}
+
+/** 설정에서 읽은 표시 종료 규칙. */
+function holdPolicy(): { presentMs: number; waitWhenAway: boolean } {
+  return {
+    presentMs: store.value.holdSec * 1000,
+    waitWhenAway: store.value.waitWhenAway,
+  };
 }
 
 function watchDisplays(): void {
@@ -192,6 +206,10 @@ function onSettingsChanged(next: Settings, prev: Settings): void {
   if (next.pollIntervalSec !== prev.pollIntervalSec || next.thresholds.join() !== prev.thresholds.join()) {
     logger.info(`폴링 설정 변경 — ${next.pollIntervalSec}초, 임계값 ${next.thresholds.join('/')}`);
     startPolling();
+  }
+
+  if (next.holdSec !== prev.holdSec || next.waitWhenAway !== prev.waitWhenAway) {
+    controller?.setPolicy(holdPolicy());
   }
 
   if (next.corner !== prev.corner || next.margin !== prev.margin || next.anchor !== prev.anchor) {
@@ -340,7 +358,11 @@ function demoScenes(): DemoScene[] {
 function runDemo(): void {
   demoScenes().forEach((scene, i) => {
     setTimeout(() => {
-      controller?.enqueue(scene.line, scene.severity, scene.gauges, store.value.corner);
+      const s = store.value;
+      controller?.enqueue(
+        scene.line, scene.severity, scene.gauges,
+        s.corner, overlaySizeFor(s.anchor), s.anchor === 'center',
+      );
     }, i * 8000);
   });
 }
@@ -357,7 +379,11 @@ async function captureDemo(dir: string): Promise<void> {
   for (const [i, scene] of demoScenes().entries()) {
     controller?.clear();
     await new Promise((r) => setTimeout(r, 120));
-    controller?.enqueue(scene.line, scene.severity, scene.gauges, store.value.corner);
+    const st = store.value;
+    controller?.enqueue(
+      scene.line, scene.severity, scene.gauges,
+      st.corner, overlaySizeFor(st.anchor), st.anchor === 'center',
+    );
     await new Promise((r) => setTimeout(r, 1400));
 
     if (!overlayWin || overlayWin.isDestroyed()) break;

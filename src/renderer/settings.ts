@@ -33,6 +33,7 @@ const els = {
   thresholdsError: $<HTMLParagraphElement>('thresholds-error'),
   hold: $<HTMLInputElement>('hold'),
   holdOut: $<HTMLOutputElement>('hold-out'),
+  waitAway: $<HTMLInputElement>('wait-away'),
   interval: $<HTMLInputElement>('interval'),
   intervalOut: $<HTMLOutputElement>('interval-out'),
   character: $<HTMLInputElement>('character'),
@@ -71,8 +72,9 @@ function formatSeconds(sec: number): string {
 
 function render(settings: Settings): void {
   els.thresholds.value = settings.thresholds.join(', ');
-  els.hold.value = String(settings.holdScale);
-  els.holdOut.textContent = `${settings.holdScale.toFixed(1)}배`;
+  els.hold.value = String(settings.holdSec);
+  els.holdOut.textContent = `${settings.holdSec}초`;
+  els.waitAway.checked = settings.waitWhenAway;
   els.interval.value = String(settings.pollIntervalSec);
   els.intervalOut.textContent = formatSeconds(settings.pollIntervalSec);
   els.character.checked = settings.characterEnabled;
@@ -134,9 +136,10 @@ els.thresholds.addEventListener('change', () => {
 });
 
 els.hold.addEventListener('input', () => {
-  els.holdOut.textContent = `${Number(els.hold.value).toFixed(1)}배`;
+  els.holdOut.textContent = `${els.hold.value}초`;
 });
-els.hold.addEventListener('change', () => void save({ holdScale: Number(els.hold.value) }));
+els.hold.addEventListener('change', () => void save({ holdSec: Number(els.hold.value) }));
+els.waitAway.addEventListener('change', () => void save({ waitWhenAway: els.waitAway.checked }));
 
 els.interval.addEventListener('input', () => {
   els.intervalOut.textContent = formatSeconds(Number(els.interval.value));
