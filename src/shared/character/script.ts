@@ -102,3 +102,28 @@ export function lineForManualCheck(snapshot: UsageSnapshot, now: number = Date.n
     holdMs: 6000,
   };
 }
+
+/**
+ * 세션이 끝났을 때의 요약.
+ *
+ * 이번 세션 동안 사용량이 얼마나 늘었는지 알려준다. 변화가 미미하면
+ * 굳이 방해할 이유가 없으므로 null을 돌려주고, 호출부는 아무것도 하지 않는다.
+ */
+export function lineForSessionEnd(
+  snapshot: UsageSnapshot,
+  startFivePercent: number,
+  now: number = Date.now(),
+): Line | null {
+  const delta = snapshot.fiveHour.percent - startFivePercent;
+  // 1%p 미만은 알릴 가치가 없다.
+  if (delta < 1) return null;
+
+  const expression: Expression = snapshot.severity === 'critical' ? 'worry' : 'happy';
+
+  return {
+    expression,
+    title: `이번 세션에 ${formatPercent(delta)} 썼어`,
+    detail: `5시간 ${formatPercent(snapshot.fiveHour.percent)} · ${formatRemaining(snapshot.fiveHour.resetsAt, now)} 뒤 초기화`,
+    holdMs: 5000,
+  };
+}

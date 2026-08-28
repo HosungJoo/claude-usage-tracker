@@ -7,8 +7,8 @@
 
 ## 현재 상태
 
-M2 (Overlay & Character) 완료 — 캐릭터가 오버레이로 등장해 사용량을 보고합니다.
-세션 시작 연동은 M3, 트레이·설정은 M4.
+M3 (Hook Integration) 완료 — Claude Code 세션을 켜면 캐릭터가 인사하며
+현재 사용량을 알려줍니다. 트레이·자동시작은 M4, 패키징은 M5.
 
 ## 사용법
 
@@ -22,7 +22,33 @@ npm run cli -- --once      # 현재 사용량 출력
 npm run cli -- --json      # JSON으로
 npm run cli -- --watch     # 폴링하며 임계값 이벤트 관찰
 npm run sprites            # 캐릭터 스프라이트 시트를 PNG로 뽑아 눈으로 확인
+
+npm run cli -- --install-hooks     # 세션 시작/종료 훅 등록
+npm run cli -- --hook-status       # 훅 설치 상태 확인
+npm run cli -- --uninstall-hooks   # 훅 제거
 ```
+
+## 세션 연동
+
+`--install-hooks` 를 한 번 실행하면 Claude Code의 `SessionStart` / `SessionEnd`
+훅에 등록됩니다. 이후 세션을 켜면 캐릭터가 나와 현재 사용량을 알려줍니다.
+
+훅은 세션 시작 경로에서 실행되므로 지키는 것이 분명합니다.
+
+- **절대 실패하지 않습니다.** 무슨 일이 있어도 종료 코드 0.
+- **절대 기다리지 않습니다.** 파일 하나 쓰고 끝 (실측 4ms).
+- **앱이 꺼져 있으면 아무 일도 하지 않습니다.** 스풀 디렉터리가 없으면 즉시 물러납니다.
+- node·socat 같은 것에 의존하지 않는 POSIX `sh` 스크립트입니다.
+
+설치기는 `~/.claude/settings.json` 에서 **우리가 넣은 것만** 건드립니다.
+직접 등록한 다른 훅과 설정은 그대로 보존되고, 제거하면 원래 상태로 돌아옵니다.
+
+나서지 않는 규칙도 있습니다. 사용자가 '시작했다'고 느끼지 않는 순간에는
+인사하지 않습니다.
+
+- `/clear`, 컴팩션으로 발생한 `SessionStart` 는 건너뜁니다.
+- 90초 안에 세션을 또 켜면 인사하지 않습니다 (여러 세션·재시작).
+- 세션 종료 요약은 사용량이 1%p 이상 늘었을 때만 나옵니다.
 
 출력 예:
 
@@ -89,9 +115,15 @@ src/shared/
   character/script.ts      표정과 대사
   ipc.ts                   메인 ↔ 렌더러 계약
 
+src/hooks/
+  hook-script.ts           훅이 실행하는 POSIX sh 스크립트
+  install.ts               settings.json 병합/제거 (우리 것만 건드린다)
+
 src/main/                  Electron 메인
   overlay-window.ts        투명·클릭통과·항상위 창 + 멀티모니터 배치
   overlay-controller.ts    표시 큐 (겹침 방지, 심각도 우선순위)
+  event-spool.ts           훅 이벤트 수신 (파일 드롭 + watch/스윕)
+  session-greeter.ts       언제 인사하고 언제 나서지 않을지
 src/preload/               contextBridge
 src/renderer/              캔버스 캐릭터 + 말풍선
 src/cli/                   헤드리스 검증 CLI

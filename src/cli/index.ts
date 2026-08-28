@@ -4,6 +4,8 @@ import { formatSnapshot } from '../core/format.js';
 import { UsagePoller } from '../core/poller.js';
 import { StateStore, defaultStatePath } from '../core/state-store.js';
 import { describeUsageError, getUsageSnapshot, UsageError } from '../core/usage-api.js';
+import { hooksInstalled, installHooks, uninstallHooks } from '../hooks/install.js';
+import { claudeSettingsPath, eventSpoolDir } from '../shared/runtime-paths.js';
 import type { ThresholdEvent } from '../core/thresholds.js';
 import type { UsageSnapshot } from '../core/types.js';
 
@@ -23,11 +25,16 @@ claude-usage-tracker CLI
   --watch           폴러를 실행하고 임계값 이벤트를 관찰한다 (Ctrl+C 로 종료)
   --interval <sec>  --watch 의 폴링 주기 (기본 60초, 최소 10초)
   --reset-state     저장된 임계값 발화 이력을 지운다
+
+  --install-hooks   세션 시작/종료 훅을 Claude Code에 등록한다
+  --uninstall-hooks 등록한 훅을 제거한다
+  --hook-status     훅 설치 상태를 확인한다
+
   --help            이 도움말
 `.trim();
 
 interface Args {
-  mode: 'once' | 'watch' | 'reset' | 'help';
+  mode: 'once' | 'watch' | 'reset' | 'help' | 'install-hooks' | 'uninstall-hooks' | 'hook-status';
   json: boolean;
   intervalMs: number;
 }
@@ -49,6 +56,15 @@ function parseArgs(argv: string[]): Args {
         break;
       case '--reset-state':
         args.mode = 'reset';
+        break;
+      case '--install-hooks':
+        args.mode = 'install-hooks';
+        break;
+      case '--uninstall-hooks':
+        args.mode = 'uninstall-hooks';
+        break;
+      case '--hook-status':
+        args.mode = 'hook-status';
         break;
       case '--json':
         args.json = true;
@@ -134,6 +150,37 @@ async function runReset(): Promise<number> {
   return ok ? 0 : 1;
 }
 
+async function runInstallHooks(): Promise<number> {
+  const result = await installHooks();
+  console.log(result.changed ? '훅을 등록했습니다.' : '훅이 이미 등록되어 있습니다.');
+  console.log(`  설정   ${result.settingsPath}`);
+  console.log(`  스크립트 ${result.scriptPath}`);
+  console.log('\n새로 여는 Claude Code 세션부터 캐릭터가 인사합니다.');
+  console.log('앱이 실행 중이 아니면 훅은 아무 일도 하지 않습니다.');
+  return 0;
+}
+
+async function runUninstallHooks(): Promise<number> {
+  const result = await uninstallHooks();
+  console.log(result.changed ? '훅을 제거했습니다.' : '등록된 훅이 없습니다.');
+  console.log(`  설정 ${result.settingsPath}`);
+  return 0;
+}
+
+async function runHookStatus(): Promise<number> {
+  const installed = await hooksInstalled();
+  const spool = eventSpoolDir();
+  const { existsSync } = await import('node:fs');
+  const running = existsSync(spool);
+
+  console.log(`훅 등록   ${installed ? '예' : '아니오'}  (${claudeSettingsPath()})`);
+  console.log(`앱 실행   ${running ? '예' : '아니오'}  (${spool})`);
+  if (installed && !running) {
+    console.log('\n훅은 등록되어 있지만 앱이 실행 중이 아닙니다. 훅은 조용히 무시됩니다.');
+  }
+  return installed ? 0 : 1;
+}
+
 async function main(): Promise<number> {
   let args: Args;
   try {
@@ -150,6 +197,9 @@ async function main(): Promise<number> {
   }
 
   try {
+    if (args.mode === 'install-hooks') return await runInstallHooks();
+    if (args.mode === 'uninstall-hooks') return await runUninstallHooks();
+    if (args.mode === 'hook-status') return await runHookStatus();
     if (args.mode === 'reset') return await runReset();
     if (args.mode === 'watch') return await runWatch(args.intervalMs, args.json);
     return await runOnce(args.json);

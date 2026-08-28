@@ -4,7 +4,9 @@ import { UsagePoller } from '../core/poller.js';
 import { normalizeUsage } from '../core/usage-api.js';
 import { gaugesFromSnapshot } from '../shared/ipc.js';
 import { lineForGreeting, lineForThreshold } from '../shared/character/script.js';
+import { EventSpool } from './event-spool.js';
 import { OverlayController } from './overlay-controller.js';
+import { SessionGreeter } from './session-greeter.js';
 import {
   createOverlayWindow,
   DEFAULT_PLACEMENT,
@@ -23,6 +25,8 @@ import type { Severity, UsageResponse } from '../core/types.js';
 let overlayWin: BrowserWindow | null = null;
 let controller: OverlayController | null = null;
 let poller: UsagePoller | null = null;
+let spool: EventSpool | null = null;
+let greeter: SessionGreeter | null = null;
 // M4에서 설정 화면이 이 값을 바꾼다. 지금은 기본값 고정.
 const placement: OverlayPlacement = DEFAULT_PLACEMENT;
 
@@ -83,6 +87,29 @@ function watchDisplays(): void {
   screen.on('display-added', reposition);
   screen.on('display-removed', reposition);
   screen.on('display-metrics-changed', reposition);
+}
+
+/**
+ * 세션 훅을 받아 캐릭터 등장으로 잇는다.
+ *
+ * 폴러가 이미 떠 있으므로, 훅이 오면 폴링 주기를 기다리지 않고
+ * 그 자리에서 다시 조회한다 — 세션을 켠 직후의 숫자여야 의미가 있다.
+ */
+function startSessionHooks(): void {
+  greeter = new SessionGreeter({
+    refresh: async () => (await poller?.refreshNow()) ?? null,
+    present: (line, snapshot) => {
+      controller?.enqueue(line, snapshot.severity, gaugesFromSnapshot(snapshot));
+    },
+  });
+
+  spool = new EventSpool((event) => {
+    void greeter?.handle(event);
+  });
+
+  void spool.start().catch((e: unknown) => {
+    console.error('[hooks] 이벤트 수신을 시작하지 못했습니다:', e);
+  });
 }
 
 function startPolling(): void {
@@ -183,6 +210,28 @@ function runDemo(): void {
  * 큐를 기다리지 않고 매번 비우고 새로 넣는다 — 여기서 보고 싶은 건
  * 큐 동작이 아니라 장면별 그림이다.
  */
+async function captureHookFlow(dir: string): Promise<void> {
+  const { writeFile, mkdir } = await import('node:fs/promises');
+  await mkdir(dir, { recursive: true });
+  await overlayWin?.webContents.insertCSS('body { background: #1e1e1e !important; }');
+
+  console.log(`hook-capture ready: ${spool?.directory ?? '(스풀 없음)'}`);
+
+  // 훅이 들어와 캐릭터가 뜰 때까지 기다렸다가 찍는다.
+  for (let i = 0; i < 40; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    if (!overlayWin || overlayWin.isDestroyed()) break;
+    if (!overlayWin.isVisible()) continue;
+
+    await new Promise((r) => setTimeout(r, 900));
+    const image = await overlayWin.webContents.capturePage();
+    await writeFile(join(dir, 'hook-greeting.png'), image.toPNG());
+    console.log('captured hook-greeting.png');
+    break;
+  }
+  app.quit();
+}
+
 async function captureDemo(dir: string): Promise<void> {
   const { writeFile, mkdir } = await import('node:fs/promises');
   await mkdir(dir, { recursive: true });
@@ -223,6 +272,8 @@ if (!app.requestSingleInstanceLock()) {
       else runDemo();
     } else {
       startPolling();
+      startSessionHooks();
+      if (CAPTURE) void captureHookFlow(CAPTURE);
     }
   });
 
@@ -235,5 +286,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on('before-quit', () => {
     poller?.stop();
     controller?.clear();
+    // 스풀 디렉터리를 지워야 훅이 '앱이 없다'를 알아챈다.
+    void spool?.stop();
   });
 }
