@@ -25,12 +25,19 @@ function expressionForSeverity(severity: Severity, percent: number): Expression 
 }
 
 /**
- * 캐릭터를 트레이 크기에 맞춰 그린다.
+ * 캐릭터를 주어진 정사각형 크기에 맞춰 그린다.
  *
  * 정수 배율만 쓴다. 소수 배율로 늘리면 픽셀이 뭉개져서 트레이에서
  * 지저분한 얼룩으로 보인다.
+ *
+ * @param margin 가장자리에 남길 여백(px). 트레이는 이미 좁아서 0이지만,
+ *   런처 아이콘은 아이콘끼리 붙어 보이지 않도록 조금 띄운다.
  */
-export function renderTrayIcon(expression: Expression, size = TRAY_SIZE): Uint8Array {
+export function renderTrayIcon(
+  expression: Expression,
+  size = TRAY_SIZE,
+  margin = 0,
+): Uint8Array {
   const frame = buildFrame({ expression, tick: 0 });
 
   // 실제로 칠해진 영역만 잘라낸다. 캔버스 여백까지 넣으면 캐릭터가 작아진다.
@@ -50,7 +57,10 @@ export function renderTrayIcon(expression: Expression, size = TRAY_SIZE): Uint8A
   const cropW = maxX - minX + 1;
   const cropH = maxY - minY + 1;
 
-  const scale = Math.max(1, Math.floor(Math.min(size / cropW, size / cropH)));
+  // 여백을 뺀 안쪽 상자에 맞춘다. 여백이 커서 상자가 사라지면 무시한다 —
+  // 아무것도 안 그리는 아이콘보다 여백 없는 아이콘이 낫다.
+  const box = Math.max(1, size - margin * 2);
+  const scale = Math.max(1, Math.floor(Math.min(box / cropW, box / cropH)));
   const drawW = cropW * scale;
   const drawH = cropH * scale;
   const offX = Math.floor((size - drawW) / 2);

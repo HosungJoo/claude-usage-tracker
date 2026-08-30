@@ -255,6 +255,12 @@ function onSettingsChanged(next: Settings, prev: Settings): void {
  * 개발 중에는 electron이 프로젝트를 인자로 받아야 하므로 둘을 나눈다.
  */
 function autostartCommand(): string {
+  // AppImage는 실행될 때마다 임시 디렉터리로 풀린다. process.execPath는
+  // 그 마운트 안(/tmp/.mount_xxxx/…)을 가리켜서 앱이 꺼지면 사라진 경로가
+  // 된다. 자동 시작에 그 경로를 적으면 다음 로그인 때 아무것도 안 뜬다.
+  // AppImage 본체가 어디 있는지는 런처가 APPIMAGE로 알려준다.
+  const appImage = process.env['APPIMAGE'];
+  if (appImage) return appImage;
   if (app.isPackaged) return process.execPath;
   return `${process.execPath} ${app.getAppPath()}`;
 }

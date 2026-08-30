@@ -38,6 +38,23 @@ describe('renderTrayIcon', () => {
   it('작은 크기에서도 죽지 않는다', () => {
     expect(() => renderTrayIcon('idle', 8)).not.toThrow();
   });
+
+  it('여백을 주면 캐릭터가 그만큼 작게 그려진다', () => {
+    // 캔버스 크기는 그대로, 칠해진 픽셀만 줄어야 한다.
+    const full = renderTrayIcon('idle', 64);
+    const inset = renderTrayIcon('idle', 64, 8);
+    expect(inset.length).toBeLessThan(full.length);
+
+    const view = new DataView(inset.buffer, inset.byteOffset);
+    expect(view.getUint32(16)).toBe(64);
+    expect(view.getUint32(20)).toBe(64);
+  });
+
+  it('여백이 캔버스를 다 먹으면 여백을 무시한다', () => {
+    // 안쪽 상자가 0 이하로 가면 아무것도 안 그린 아이콘이 나온다.
+    // 빈 아이콘보다는 여백 없는 아이콘이 낫다.
+    expect(renderTrayIcon('idle', 16, 40)).toEqual(renderTrayIcon('idle', 16, 0));
+  });
 });
 
 describe('trayTooltip', () => {

@@ -1,0 +1,45 @@
+# AppImage 하나로 배포한다.
+#
+# deb/rpm 대신 AppImage인 이유: 이 앱은 배포판을 가리지 않고, 설치 권한도
+# 필요 없다. 사용자가 파일 하나 받아 실행 권한만 주면 끝나는 쪽이
+# '사용량이 궁금해서 잠깐 써보는' 첫 만남에 맞는다.
+
+appId: cc.supergate.claude-usage-tracker
+productName: Claude Usage Tracker
+copyright: © 2026 HosungJu
+
+directories:
+  output: release
+  buildResources: build
+
+# 번들에 들어갈 것만 명시한다. 기본값은 리포 전체를 훑어서 tools/ 나
+# test/ 까지 딸려 들어간다.
+files:
+  - out/**/*
+  - package.json
+
+# 네이티브 모듈이 없다. 매 빌드마다 도는 rebuild는 시간만 쓴다.
+npmRebuild: false
+
+linux:
+  target:
+    - AppImage
+  category: Utility
+  # 캐릭터에서 생성한 아이콘들. build/icons/ 는 tools/make-icons.ts 가 만든다.
+  icon: build/icons
+  synopsis: Claude 사용량 알리미
+  description: 픽셀 클로드 캐릭터가 Claude 사용량을 먼저 알려주는 데스크톱 앱입니다.
+  desktop:
+    entry:
+      Name: Claude Usage Tracker
+      Comment: Claude 사용량을 캐릭터가 알려줍니다
+      Categories: Utility;Monitor;
+      Keywords: claude;usage;monitor;
+      # 창 없이 트레이에만 사는 앱이다. 창이 떴을 때 런처가 이 아이콘과
+      # 묶어 보여주도록 WM 클래스를 밝혀 둔다.
+      StartupWMClass: claude-usage-tracker
+
+appImage:
+  # productName에 공백이 있어 그대로 쓰면 파일명에 공백이 들어간다.
+  # 내려받아 chmod 하고 실행하는 파일이라 공백 없는 이름이 낫다.
+  artifactName: claude-usage-tracker-${version}-${arch}.AppImage
