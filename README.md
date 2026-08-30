@@ -5,10 +5,52 @@
 기존 사용량 도구는 막대 그래프만 보여주거나 마우스를 갖다 대야 확인할 수 있습니다.
 이 앱은 백그라운드에 상주하며, 임계값에 도달하면 캐릭터가 **알아서 나타나** 보고합니다.
 
+![시작할 때 인사](docs/greeting.png)
+
+| 90% | 100% |
+|---|---|
+| ![90%](docs/threshold-90.png) | ![100%](docs/threshold-100.png) |
+
 ## 현재 상태
 
-M4 (Tray & Settings) 완료 — 트레이에 상주하며 로그인 시 자동으로 뜹니다.
-설정 화면에서 임계값·위치·주기를 바꿀 수 있습니다. 패키징은 M5.
+M5 (Package & Release) 완료 — AppImage로 묶어 내려받아 바로 실행합니다.
+커밋마다 CI가 검사하고, `v*` 태그를 밀면 AppImage 아티팩트가 나옵니다.
+
+## 설치
+
+세 단계면 끝납니다.
+
+**1. 받아서 실행**
+
+[파이프라인 아티팩트](https://dev.azure.com/wnghtjd303/ClaudeUsageTracker/_build)에서
+`claude-usage-tracker-<버전>-x86_64.AppImage` 를 받습니다.
+
+```bash
+chmod +x claude-usage-tracker-*-x86_64.AppImage
+./claude-usage-tracker-*-x86_64.AppImage
+```
+
+창은 뜨지 않습니다. 트레이 아이콘이 생기면 뜬 것입니다 — 창이 없는 것이
+이 앱의 정상 상태입니다.
+
+설치 파일이 아니라 실행 파일 하나입니다. 원하는 곳에 두면 되고,
+지울 때는 파일과 `~/.config/claude-usage-tracker/` 를 지우면 됩니다.
+
+**2. 세션 훅 등록** (선택)
+
+Claude Code 세션을 시작할 때 캐릭터가 먼저 인사하게 합니다.
+
+```bash
+npm run cli -- --install-hooks   # 리포에서
+```
+
+`~/.claude/settings.json` 에 SessionStart/SessionEnd 훅을 넣습니다.
+등록하지 않아도 임계값 알림은 그대로 동작합니다.
+
+**3. 로그인 시 자동 실행** (선택)
+
+트레이 → **설정…** → *로그인 시 자동 실행*을 켭니다.
+`~/.config/autostart/` 에 항목이 생깁니다.
 
 ## 사용법
 
@@ -22,7 +64,11 @@ npm run cli -- --once      # 현재 사용량 출력
 npm run cli -- --json      # JSON으로
 npm run cli -- --watch     # 폴링하며 임계값 이벤트 관찰
 npm run sprites            # 캐릭터 스프라이트 시트를 PNG로 뽑아 눈으로 확인
+npm run shots              # README에 쓰는 장면 스크린샷을 docs/ 에 다시 뽑는다
 npm run check:transparency # 오버레이가 실제로 투명한지 검사
+
+npm run package            # AppImage 빌드 → release/
+npm run icons              # 캐릭터에서 앱 아이콘 생성 → build/
 
 npm run cli -- --install-hooks     # 세션 시작/종료 훅 등록
 npm run cli -- --hook-status       # 훅 설치 상태 확인
@@ -150,6 +196,11 @@ XDG autostart 규격(`~/.config/autostart/*.desktop`)을 직접 씁니다. Elect
 
 `X-GNOME-Autostart-Delay=8` 을 두는 이유: 로그인 직후에는 네트워크가 아직 붙지
 않아 첫 조회가 실패합니다. 몇 초 늦게 뜨면 그 실패를 아예 겪지 않습니다.
+
+`Exec=` 에는 **AppImage 파일 경로**를 적습니다. AppImage는 실행될 때마다
+임시 디렉터리로 풀리기 때문에, `process.execPath`(= `/tmp/.mount_xxxx/…`)를
+적으면 다음 로그인 때 없는 경로가 됩니다. 런처가 알려주는 `APPIMAGE` 를
+먼저 봅니다. AppImage를 다른 곳으로 옮겼다면 자동 시작을 껐다 켜세요.
 
 ## 로그
 
@@ -304,7 +355,15 @@ src/main/                  Electron 메인
 src/preload/               contextBridge
 src/renderer/              캔버스 캐릭터 + 말풍선
 src/cli/                   헤드리스 검증 CLI
-tools/                     스프라이트 미리보기
+
+tools/
+  preview-sprites.ts       스프라이트 시트 미리보기
+  make-icons.ts            캐릭터에서 앱 아이콘 생성 (패키징 직전)
+  check-transparency.cjs   오버레이 투명도 검사
+
+electron-builder.yml       AppImage 패키징
+azure-pipelines.yml        CI(검사) + 릴리스(태그 → AppImage)
+docs/                      README에 쓰는 장면 스크린샷 (npm run shots)
 ```
 
 ## 투명
@@ -335,6 +394,44 @@ npm run check:transparency
 - **포커스를 훔치지 않습니다** (`showInactive` + `focusable: false`). 타이핑 중에 떠도 글자를 가로채지 않습니다.
 - 작업표시줄에 뜨지 않고, 전체화면 앱 위에도 표시됩니다.
 - 알림이 몰려도 **하나씩** 나옵니다. 더 심각한 소식이 먼저 나옵니다.
+
+## 패키징
+
+AppImage 하나로 냅니다. deb/rpm처럼 시스템에 자리를 잡는 대신, 파일 하나
+받아 실행 권한만 주면 되는 쪽이 '사용량이 궁금해서 잠깐 써보는' 첫 만남에
+맞습니다. 배포판도 가리지 않고 설치 권한도 필요 없습니다.
+
+```bash
+npm run package    # build → icons → electron-builder → release/*.AppImage
+```
+
+아이콘은 리포에 두지 않고 패키징 직전에 **캐릭터에서 새로 그립니다**
+(`tools/make-icons.ts`). 트레이 아이콘과 같은 이유입니다 — 커밋된 PNG는
+캐릭터가 바뀔 때 동기화를 사람이 기억해야 합니다. 런처에서는 아이콘끼리
+붙어 보이지 않아야 해서 8%를 비웁니다.
+
+## CI / 릴리스
+
+`azure-pipelines.yml` — 두 단계입니다.
+
+| 단계 | 언제 | 무엇 |
+|---|---|---|
+| Verify | 모든 푸시 · PR | lint → typecheck → test → build |
+| Package | `v*` 태그 | 버전 확인 → AppImage → 아티팩트 |
+
+나눈 이유: 검사는 매번 돌아야 하지만 패키징은 100MB를 만들어 내는 일이라
+릴리스할 때만 돕니다. Verify가 실패하면 Package는 시작하지 않습니다.
+
+릴리스하려면 `package.json` 버전을 올리고 같은 이름의 태그를 밉니다.
+
+```bash
+npm version 0.2.0    # package.json + 태그 v0.2.0
+git push --follow-tags
+```
+
+Package 단계가 태그와 `package.json` 버전이 같은지 먼저 확인하고, 다르면
+빌드를 시작하기 전에 멈춥니다. 어긋난 채로 릴리스가 나가면 나중에 어느
+쪽이 맞는지 알 수 없기 때문입니다.
 
 ## 개발
 

@@ -408,7 +408,7 @@ async function captureDemo(dir: string): Promise<void> {
   const shot = host?.anyWindow() ?? null;
   await shot?.webContents.insertCSS('body { background: #1e1e1e !important; }');
 
-  for (const [i, scene] of demoScenes().entries()) {
+  for (const scene of demoScenes()) {
     controller?.clear();
     await new Promise((r) => setTimeout(r, 120));
     const st = store.value;
@@ -420,8 +420,10 @@ async function captureDemo(dir: string): Promise<void> {
 
     if (!shot || shot.isDestroyed()) break;
     const image = await shot.webContents.capturePage();
-    await writeFile(join(dir, `${i}-${scene.name}.png`), image.toPNG());
-    console.log(`captured ${i}-${scene.name}.png`);
+    // 파일명에 순번을 붙이지 않는다 — README가 이 이름을 그대로 걸고
+    // 있어서, 장면이 하나 늘면 번호가 밀려 링크가 어긋난다.
+    await writeFile(join(dir, `${scene.name}.png`), image.toPNG());
+    console.log(`captured ${scene.name}.png`);
   }
   app.quit();
 }

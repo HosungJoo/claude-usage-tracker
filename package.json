@@ -14,6 +14,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "dev": "electron-vite dev",
     "demo": "electron-vite dev -- --demo",
+    "shots": "electron-vite dev -- --demo --capture=docs",
     "build": "electron-vite build",
     "icons": "tsx tools/make-icons.ts",
     "package": "npm run build && npm run icons && electron-builder --linux AppImage",

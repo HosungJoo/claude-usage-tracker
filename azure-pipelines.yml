@@ -1,0 +1,102 @@
+# CI — 커밋마다 검사하고, 태그를 밀면 AppImage를 낸다.
+#
+# 두 단계로 나눈 이유: 검사는 모든 푸시·PR에서 돌아야 하지만 패키징은
+# 108MB를 만들어 내는 일이라 릴리스할 때만 돈다. Verify가 실패하면
+# Package는 아예 시작하지 않는다.
+
+trigger:
+  branches:
+    include:
+      - master
+  tags:
+    include:
+      - v*
+
+pr:
+  branches:
+    include:
+      - master
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  # 태그 푸시일 때만 패키징한다.
+  isRelease: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/v')]
+
+stages:
+  - stage: Verify
+    displayName: 검사
+    jobs:
+      - job: Check
+        displayName: lint · typecheck · test · build
+        steps:
+          - task: NodeTool@0
+            displayName: Node 설치
+            inputs:
+              # 개발 환경과 같은 메이저를 쓴다. Electron 33이 기대하는 런타임이다.
+              versionSpec: '20.x'
+
+          - script: npm ci
+            displayName: 의존성 설치
+
+          - script: npm run lint
+            displayName: lint
+
+          - script: npm run typecheck
+            displayName: typecheck
+
+          - script: npm test
+            displayName: test
+
+          # 빌드까지 해 봐야 번들 단계에서만 드러나는 문제를 잡는다.
+          - script: npm run build
+            displayName: build
+
+  - stage: Package
+    displayName: 패키징
+    dependsOn: Verify
+    condition: and(succeeded(), eq(variables.isRelease, true))
+    jobs:
+      - job: AppImage
+        displayName: AppImage 빌드
+        steps:
+          - task: NodeTool@0
+            displayName: Node 설치
+            inputs:
+              versionSpec: '20.x'
+
+          - script: npm ci
+            displayName: 의존성 설치
+
+          # 태그가 v0.1.0 이면 package.json도 0.1.0 이어야 한다.
+          # 어긋난 채로 릴리스가 나가면 나중에 어느 쪽이 맞는지 알 수 없다.
+          - script: |
+              tag="${BUILD_SOURCEBRANCHNAME#v}"
+              pkg=$(node -p "require('./package.json').version")
+              if [ "$tag" != "$pkg" ]; then
+                echo "##vso[task.logissue type=error]태그 v$tag 와 package.json $pkg 가 다릅니다"
+                exit 1
+              fi
+              echo "버전 $pkg"
+            displayName: 버전 확인
+
+          - script: npm run package
+            displayName: AppImage 빌드
+            env:
+              # electron-builder가 GitHub 릴리스로 올리려 드는 것을 막는다.
+              # 배포는 파이프라인 아티팩트로만 한다.
+              CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+          # release/ 에는 linux-unpacked/ 도 같이 남는다. 그건 AppImage를
+          # 만들기 위한 중간 산물이라 올릴 이유가 없다.
+          - task: CopyFiles@2
+            displayName: AppImage만 추린다
+            inputs:
+              sourceFolder: release
+              contents: '*.AppImage'
+              targetFolder: $(Build.ArtifactStagingDirectory)
+
+          - publish: $(Build.ArtifactStagingDirectory)
+            artifact: appimage
+            displayName: 아티팩트 퍼블리시
