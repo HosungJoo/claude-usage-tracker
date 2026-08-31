@@ -47,6 +47,8 @@ cross a threshold **the character comes to you.** You do nothing.
   never steals focus, gone in 3 seconds.
 - **Tray at a glance.** The tray icon is generated from the character itself and
   changes expression with your usage level.
+- **Comes to VS Code too.** A companion extension puts the same character and
+  numbers in the sidebar beside the Claude Code panel — no window switch.
 - **Speaks English or Korean.** Follows your desktop language by default; you can
   pin either one in Settings. Every surface is translated — the character's lines,
   the tray, the settings window, errors, the CLI, and the log file you would send
@@ -76,6 +78,17 @@ npm run cli -- --install-hooks    # from a clone of this repo
 
 **Optional — start on login.** Tray → *Settings* → *Start on login*.
 Writes an XDG autostart entry.
+
+**Optional — VS Code extension.** The same alerts inside the editor, in the
+sidebar next to the Claude Code panel:
+
+```bash
+code --install-extension hosungjoo.claude-usage-tracker-vscode
+```
+
+[Claude Usage Tracker for Claude Code](https://marketplace.visualstudio.com/items?itemName=hosungjoo.claude-usage-tracker-vscode) on the Marketplace. It works on its
+own, and alongside the tray app only one of the two speaks at a time — the panel
+takes the alert while it's visible, the overlay takes it otherwise.
 
 ## Requirements
 

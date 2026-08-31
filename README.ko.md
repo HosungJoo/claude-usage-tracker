@@ -54,6 +54,18 @@ npm run cli -- --install-hooks   # 리포에서
 트레이 → **설정…** → *로그인 시 자동 실행*을 켭니다.
 `~/.config/autostart/` 에 항목이 생깁니다.
 
+**4. VS Code 확장** (선택)
+
+편집기 안에서도 같은 알림을 받습니다. Claude Code 패널 옆 사이드바에 뜹니다.
+
+```bash
+code --install-extension hosungjoo.claude-usage-tracker-vscode
+```
+
+마켓플레이스: [Claude Usage Tracker for Claude Code](https://marketplace.visualstudio.com/items?itemName=hosungjoo.claude-usage-tracker-vscode).
+확장만 써도 동작하고, 트레이 앱과 함께 켜 두면 둘 중 하나만 말합니다 —
+패널이 보이는 동안에는 패널이 맡고, 아니면 오버레이가 맡습니다.
+
 ## 사용법
 
 ```bash

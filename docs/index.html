@@ -226,6 +226,7 @@
   <div class="cta">
     <a class="btn btn-primary" href="https://github.com/HosungJoo/claude-usage-tracker/releases/latest">Download AppImage</a>
     <a class="btn btn-ghost" href="https://github.com/HosungJoo/claude-usage-tracker">View on GitHub</a>
+    <a class="btn btn-ghost" href="https://marketplace.visualstudio.com/items?itemName=hosungjoo.claude-usage-tracker-vscode">VS Code extension</a>
   </div>
   <p class="meta">Free and open source (MIT) · ~70 MiB · Linux x86-64 · no account, no API key</p>
 </header>
@@ -277,6 +278,10 @@
       <h3>Tray at a glance</h3>
       <p>The tray icon is generated from the character and changes expression with your usage level.</p>
     </div>
+    <div class="card">
+      <h3>In VS Code too</h3>
+      <p>A companion extension puts the same character in the sidebar beside the Claude Code panel. Only one of the two speaks at a time.</p>
+    </div>
   </div>
 </section>
 
@@ -301,10 +306,18 @@
   <p class="lede">One file. No installer, no root, no package manager.</p>
 <pre><code>chmod +x claude-usage-tracker-*-x86_64.AppImage
 ./claude-usage-tracker-*-x86_64.AppImage</code></pre>
-  <p class="lede" style="margin-bottom:0">
+  <p class="lede">
     No window opens — that's correct. Look for the tray icon; a window-less tray
     app is this program's normal state. To uninstall, delete the file and
     <code>~/.config/claude-usage-tracker/</code>.
+  </p>
+  <h3>VS Code extension</h3>
+  <p class="lede">Optional. The same alerts in the sidebar, next to the Claude Code panel:</p>
+<pre><code>code --install-extension hosungjoo.claude-usage-tracker-vscode</code></pre>
+  <p class="lede" style="margin-bottom:0">
+    <a href="https://marketplace.visualstudio.com/items?itemName=hosungjoo.claude-usage-tracker-vscode">Claude Usage Tracker for Claude Code</a> on the Marketplace.
+    It works on its own; with the tray app running, the panel takes the alert
+    while it's visible and the overlay takes it otherwise.
   </p>
 </section>
 

@@ -225,6 +225,7 @@
   <div class="cta">
     <a class="btn btn-primary" href="https://github.com/HosungJoo/claude-usage-tracker/releases/latest">AppImage 내려받기</a>
     <a class="btn btn-ghost" href="https://github.com/HosungJoo/claude-usage-tracker">GitHub에서 보기</a>
+    <a class="btn btn-ghost" href="https://marketplace.visualstudio.com/items?itemName=hosungjoo.claude-usage-tracker-vscode">VS Code 확장</a>
   </div>
   <p class="meta">무료 · 오픈소스(MIT) · 약 70 MiB · Linux x86-64 · 계정도 API 키도 필요 없음</p>
 </header>
@@ -276,6 +277,10 @@
       <h3>트레이에서 한눈에</h3>
       <p>트레이 아이콘은 캐릭터에서 직접 생성되며, 사용량 구간에 따라 표정이 바뀝니다.</p>
     </div>
+    <div class="card">
+      <h3>VS Code 안에서도</h3>
+      <p>확장을 함께 쓰면 Claude Code 패널 옆 사이드바에 같은 캐릭터가 뜹니다. 둘 중 하나만 말합니다.</p>
+    </div>
   </div>
 </section>
 
@@ -300,10 +305,18 @@
   <p class="lede">파일 하나. 설치 프로그램도, root도, 패키지 매니저도 필요 없습니다.</p>
 <pre><code>chmod +x claude-usage-tracker-*-x86_64.AppImage
 ./claude-usage-tracker-*-x86_64.AppImage</code></pre>
-  <p class="lede" style="margin-bottom:0">
+  <p class="lede">
     창은 뜨지 않습니다 — 정상입니다. 트레이 아이콘을 찾으세요. 창이 없는 것이
     이 앱의 정상 상태입니다. 지울 때는 파일과
     <code>~/.config/claude-usage-tracker/</code> 를 지우면 됩니다.
+  </p>
+  <h3>VS Code 확장</h3>
+  <p class="lede">선택입니다. 편집기 안에서도, Claude Code 패널 옆에서 같은 알림을 받습니다:</p>
+<pre><code>code --install-extension hosungjoo.claude-usage-tracker-vscode</code></pre>
+  <p class="lede" style="margin-bottom:0">
+    마켓플레이스: <a href="https://marketplace.visualstudio.com/items?itemName=hosungjoo.claude-usage-tracker-vscode">Claude Usage Tracker for Claude Code</a>.
+    확장만 써도 동작하고, 트레이 앱과 함께 켜 두면 패널이 보이는 동안에는
+    패널이, 아니면 오버레이가 알립니다.
   </p>
 </section>
 
