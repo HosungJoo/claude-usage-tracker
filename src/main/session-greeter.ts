@@ -10,12 +10,18 @@ import type { UsageSnapshot } from '../core/types.js';
 /**
  * 훅 이벤트를 캐릭터 등장으로 바꾸는 곳.
  *
- * 여기서 가장 중요한 판단은 '언제 나서지 않을지'다. 세션을 여러 개 켜거나
- * 껐다 켜기를 반복하는 건 흔한 일인데, 그때마다 캐릭터가 튀어나오면
- * 이 앱은 방해물이 된다.
+ * 여기서 가장 중요한 판단은 '언제 나서지 않을지'다. 한 세션이 /clear 나
+ * 컴팩션으로 시작을 되풀이해 알려오는 건 흔한 일인데, 그때마다 캐릭터가
+ * 튀어나오면 이 앱은 방해물이 된다. 반대로 처음 보는 세션은 사용자가
+ * 직접 연 것이므로, 다른 인사 직후라도 인사한다.
  */
 
-/** 이 시간 안에 다시 세션이 시작되면 인사하지 않는다. */
+/**
+ * 이 시간 안에 '같은' 세션이 다시 알려오면 인사하지 않는다.
+ *
+ * 처음 보는 세션에는 적용하지 않는다. 사용자가 정말로 새 세션을 연 순간은
+ * 이 앱이 존재하는 이유이고, 그 순간까지 삼키면 남는 건 침묵뿐이다.
+ */
 export const GREET_COOLDOWN_MS = 90_000;
 
 /**
@@ -77,6 +83,11 @@ export class SessionGreeter {
   private async onSessionStart(event: HookEvent): Promise<void> {
     if (event.source !== undefined && !GREETABLE_SOURCES.has(event.source)) return;
 
+    // 아래에서 이 맵에 기록하고 나면 처음 보는 세션인지 알 수 없다.
+    // 판단은 기록보다 먼저 해 둔다.
+    const id = event.session_id;
+    const isNewSession = id ? !this.sessionStart.has(id) : false;
+
     const since = this.now() - this.lastGreetAt;
     const withinCooldown = this.lastGreetAt > 0 && since < GREET_COOLDOWN_MS;
 
@@ -85,9 +96,10 @@ export class SessionGreeter {
 
     // 인사를 건너뛰더라도 세션 시작 시점은 기록해 둔다 —
     // 종료 요약은 여전히 정확해야 한다.
-    if (event.session_id) this.sessionStart.set(event.session_id, snapshot.fiveHour.percent);
+    if (id) this.sessionStart.set(id, snapshot.fiveHour.percent);
 
-    if (withinCooldown) return;
+    // 세션 id가 없으면 같은 세션인지 가릴 수 없다. 그때는 쿨다운을 지킨다.
+    if (withinCooldown && !isNewSession) return;
     this.lastGreetAt = this.now();
     this.deps.present(lineForGreeting(snapshot, snapshot.fetchedAt), snapshot, event.cwd ?? null);
   }

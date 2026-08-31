@@ -77,25 +77,45 @@ describe('SessionStart', () => {
     expect(h.shown).toHaveLength(0);
   });
 
-  it('짧은 시간 안에 다시 시작하면 인사하지 않는다', async () => {
+  it('같은 세션이 곧바로 다시 알려오면 인사하지 않는다', async () => {
     await h.greeter.handle({ hook_event_name: 'SessionStart', source: 'startup', session_id: 's1' });
     h.setNow(T0 + 5000);
-    await h.greeter.handle({ hook_event_name: 'SessionStart', source: 'startup', session_id: 's2' });
+    await h.greeter.handle({ hook_event_name: 'SessionStart', source: 'resume', session_id: 's1' });
     expect(h.shown).toHaveLength(1);
   });
 
-  it('쿨다운이 지나면 다시 인사한다', async () => {
+  it('처음 보는 세션이면 쿨다운 중에도 인사한다 — 사용자가 직접 연 순간이다', async () => {
     await h.greeter.handle({ hook_event_name: 'SessionStart', source: 'startup', session_id: 's1' });
-    h.setNow(T0 + GREET_COOLDOWN_MS + 1);
+    h.setNow(T0 + 5000);
     await h.greeter.handle({ hook_event_name: 'SessionStart', source: 'startup', session_id: 's2' });
     expect(h.shown).toHaveLength(2);
   });
 
-  it('인사를 건너뛰어도 세션 시작 시점은 기록한다', async () => {
+  it('세션 id가 없으면 쿨다운을 지킨다 — 같은 세션인지 가릴 수 없다', async () => {
+    await h.greeter.handle({ hook_event_name: 'SessionStart', source: 'startup' });
+    h.setNow(T0 + 5000);
+    await h.greeter.handle({ hook_event_name: 'SessionStart', source: 'startup' });
+    expect(h.shown).toHaveLength(1);
+  });
+
+  it('쿨다운이 지나면 같은 세션에도 다시 인사한다', async () => {
     await h.greeter.handle({ hook_event_name: 'SessionStart', source: 'startup', session_id: 's1' });
+    h.setNow(T0 + GREET_COOLDOWN_MS + 1);
+    await h.greeter.handle({ hook_event_name: 'SessionStart', source: 'resume', session_id: 's1' });
+    expect(h.shown).toHaveLength(2);
+  });
+
+  it('인사를 건너뛰어도 세션 시작 시점은 갱신한다', async () => {
+    await h.greeter.handle({ hook_event_name: 'SessionStart', source: 'startup', session_id: 's1' });
+    h.setUsage(snap(40));
     h.setNow(T0 + 1000);
-    await h.greeter.handle({ hook_event_name: 'SessionStart', source: 'startup', session_id: 's2' });
-    expect(h.greeter.trackedSessions).toBe(2);
+    // 같은 세션이라 인사는 건너뛰지만, 종료 요약의 기준점은 40%가 되어야 한다.
+    await h.greeter.handle({ hook_event_name: 'SessionStart', source: 'resume', session_id: 's1' });
+    expect(h.shown).toHaveLength(1);
+
+    h.setUsage(snap(55));
+    await h.greeter.handle({ hook_event_name: 'SessionEnd', session_id: 's1' });
+    expect(h.shown[1]?.title).toContain('15%');
   });
 
   it('사용량을 못 읽으면 조용히 넘어간다', async () => {
