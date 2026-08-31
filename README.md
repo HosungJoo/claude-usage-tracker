@@ -1,461 +1,184 @@
 # Claude Usage Tracker
 
-픽셀 클로드 캐릭터가 Claude 사용량을 **먼저** 알려주는 데스크톱 앱.
+**A pixel Claude character that tells you your Claude usage before you ask.**
+A Linux desktop tray app that reads the official Claude usage API and pops up on
+your screen when you hit 50%, 70%, 90% and 100% — so you never discover the
+limit by being cut off mid-task.
 
-기존 사용량 도구는 막대 그래프만 보여주거나 마우스를 갖다 대야 확인할 수 있습니다.
-이 앱은 백그라운드에 상주하며, 임계값에 도달하면 캐릭터가 **알아서 나타나** 보고합니다.
+[![Release](https://img.shields.io/github/v/release/HosungJu/claude-usage-tracker?label=download&color=brightgreen)](https://github.com/HosungJu/claude-usage-tracker/releases/latest)
+[![Platform](https://img.shields.io/badge/platform-Linux-informational)](#install)
+[![AppImage](https://img.shields.io/badge/AppImage-70%20MiB-blue)](https://github.com/HosungJu/claude-usage-tracker/releases/latest)
+[![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
-![시작할 때 인사](docs/greeting.png)
+[한국어 문서 →](README.ko.md)
 
-| 90% | 100% |
+![Claude Usage Tracker greeting overlay](docs/greeting.png)
+
+---
+
+## Why this exists
+
+Every other Claude usage tool has the same shape: a bar chart you have to open,
+or a number you have to hover over. That means **you only learn your usage when
+you already thought to check.** The moment that actually matters — the moment
+you're about to lose your five-hour window mid-refactor — is the moment you
+weren't looking.
+
+This app inverts that. It sits in your tray, polls the usage API, and when you
+cross a threshold **the character comes to you.** You do nothing.
+
+| 90% — worried | 100% — out |
 |---|---|
-| ![90%](docs/threshold-90.png) | ![100%](docs/threshold-100.png) |
+| ![Claude usage at 90 percent](docs/threshold-90.png) | ![Claude usage limit reached](docs/threshold-100.png) |
 
-## 현재 상태
+## What it does
 
-M5 (Package & Release) 완료 — AppImage로 묶어 내려받아 바로 실행합니다.
-커밋마다 CI가 검사하고, `v*` 태그를 밀면 AppImage 아티팩트가 나옵니다.
+- **Tells you first.** Character appears at 50 / 70 / 90 / 100% of your five-hour
+  and weekly limits. Thresholds are configurable.
+- **Waits until you're actually there.** If you're away from the keyboard or the
+  screen is locked, it holds the message until you come back. An alert you
+  didn't see is an alert that didn't happen.
+- **Shows on every monitor.** On Wayland an app cannot ask where your cursor or
+  windows are — so instead of guessing which screen you're looking at, it draws
+  on all of them. You can't be wrong if you don't guess.
+- **Greets you when a Claude Code session starts.** Optional `SessionStart` hook
+  integration tells you what's left before you begin.
+- **Stays out of the way.** Transparent, click-through overlay. No taskbar entry,
+  never steals focus, gone in 3 seconds.
+- **Tray at a glance.** The tray icon is generated from the character itself and
+  changes expression with your usage level.
 
-## 설치
+## Install
 
-세 단계면 끝납니다.
-
-**1. 받아서 실행**
-
-[파이프라인 아티팩트](https://dev.azure.com/wnghtjd303/ClaudeUsageTracker/_build)에서
-`claude-usage-tracker-<버전>-x86_64.AppImage` 를 받습니다.
+Download the AppImage from the [latest release](https://github.com/HosungJu/claude-usage-tracker/releases/latest):
 
 ```bash
 chmod +x claude-usage-tracker-*-x86_64.AppImage
 ./claude-usage-tracker-*-x86_64.AppImage
 ```
 
-창은 뜨지 않습니다. 트레이 아이콘이 생기면 뜬 것입니다 — 창이 없는 것이
-이 앱의 정상 상태입니다.
+No window opens — that's correct. Look for the tray icon. A window-less tray app
+is this program's normal state.
 
-설치 파일이 아니라 실행 파일 하나입니다. 원하는 곳에 두면 되고,
-지울 때는 파일과 `~/.config/claude-usage-tracker/` 를 지우면 됩니다.
+There is no installer. It's one file: put it wherever you like, delete it and
+`~/.config/claude-usage-tracker/` to uninstall.
 
-**2. 세션 훅 등록** (선택)
-
-Claude Code 세션을 시작할 때 캐릭터가 먼저 인사하게 합니다.
-
-```bash
-npm run cli -- --install-hooks   # 리포에서
-```
-
-`~/.claude/settings.json` 에 SessionStart/SessionEnd 훅을 넣습니다.
-등록하지 않아도 임계값 알림은 그대로 동작합니다.
-
-**3. 로그인 시 자동 실행** (선택)
-
-트레이 → **설정…** → *로그인 시 자동 실행*을 켭니다.
-`~/.config/autostart/` 에 항목이 생깁니다.
-
-## 사용법
+**Optional — session hooks.** To have the character greet you when a Claude Code
+session starts:
 
 ```bash
-npm install
-
-npm run dev                # 앱 실행 (실제 사용량 폴링)
-npm run demo               # 임계값 50/70/90/100 연출을 8초 간격으로 재생
-
-npm run cli -- --once      # 현재 사용량 출력
-npm run cli -- --json      # JSON으로
-npm run cli -- --watch     # 폴링하며 임계값 이벤트 관찰
-npm run sprites            # 캐릭터 스프라이트 시트를 PNG로 뽑아 눈으로 확인
-npm run shots              # README에 쓰는 장면 스크린샷을 docs/ 에 다시 뽑는다
-npm run check:transparency # 오버레이가 실제로 투명한지 검사
-
-npm run package            # AppImage 빌드 → release/
-npm run icons              # 캐릭터에서 앱 아이콘 생성 → build/
-
-npm run cli -- --install-hooks     # 세션 시작/종료 훅 등록
-npm run cli -- --hook-status       # 훅 설치 상태 확인
-npm run cli -- --uninstall-hooks   # 훅 제거
+npm run cli -- --install-hooks    # from a clone of this repo
 ```
 
-## 트레이
+**Optional — start on login.** Tray → *설정… (Settings)* → *Start on login*.
+Writes an XDG autostart entry.
 
-창이 없는 것이 이 앱의 정상 상태입니다. 트레이 아이콘이 유일한 상시 접점이라
-거기서 세 가지가 보입니다 — 지금 사용량(아이콘 + 툴팁), 지금 확인(클릭),
-문제가 생겼을 때 볼 곳(로그).
+## Requirements
 
-아이콘은 **캐릭터에서 직접 생성**합니다. 별도 아이콘 파일을 두면 캐릭터가
-바뀔 때 동기화를 사람이 기억해야 하기 때문입니다. 사용량 구간에 따라
-`idle → worry → alert → faint` 로 표정이 바뀝니다. 트레이는 아주 작으므로
-실루엣 차이가 큰 표정만 고릅니다 — 눈 슬릿 한 칸 차이는 이 크기에서 보이지 않습니다.
+- Linux with a desktop environment (developed and verified on GNOME/Wayland;
+  X11 and KDE/XFCE should work — the app uses XDG standards throughout)
+- [Claude Code](https://claude.com/claude-code) installed and signed in — the
+  app reads your existing OAuth token from `~/.claude/.credentials.json`
+- No account, key, or configuration of its own
 
-## 설정
+## How it reads your usage
 
-트레이 → **설정…** 또는 `~/.config/claude-usage-tracker/settings.json`.
-
-| 항목 | 기본값 | 범위 |
-|---|---|---|
-| 알릴 사용량 | 50, 70, 90, 100 | 1~100, 자동 정렬·중복 제거 |
-| 보고 있을 때 표시 시간 | 3초 | 1~30초 |
-| 자리 비웠으면 기다리기 | 켜짐 | |
-| 확인 주기 | 60초 | 15~600초 |
-| 화면에 띄우기 | 켜짐 | 끄면 트레이만 동작 |
-| 띄울 모니터 | 모든 모니터 | 전부 / 주 / 커서 / 특정 모니터 |
-| 기준 | 화면 한가운데 (크게) | 한가운데 / 화면 모서리 / 작업 중인 창 |
-| 나타나는 위치 | 왼쪽 위 | 네 모서리 (한가운데 모드에서는 무시) |
-| 가장자리 여백 | 24px | 0~200px |
-| 시작할 때 인사 | 켜짐 | |
-| 로그인 시 자동 실행 | 꺼짐 | XDG autostart |
-
-**저장 버튼이 없습니다.** 값을 바꾸면 바로 적용되고 저장됩니다 — 설정이 열 개도
-안 되는 화면에서 저장 버튼은 눌렀는지 아닌지만 헷갈리게 합니다.
-
-설정 파일은 사람이 직접 열어 고칠 수 있습니다. 그래서 읽기가 관대합니다 —
-값 하나가 이상하면 **그 값만** 기본값으로 되돌리고 나머지는 살립니다.
-파일이 통째로 깨져도 앱은 기본값으로 뜹니다.
-
-## 못 보면 없는 알림입니다
-
-이 앱의 실패 방식은 하나뿐입니다 — **캐릭터가 떴는데 사용자가 못 봤다.**
-자리를 비운 사이, 화면이 꺼진 사이에 떴다 사라지면 아무 일도 하지 않은 것과
-같습니다. 그래서 두 가지를 합니다.
-
-**하나. 한가운데에 크게.** 기본값은 커서가 있는 화면 한가운데에 880×520
-크기로 띄우는 것입니다. 캐릭터는 픽셀 배율 14배(336×224)로 그려집니다.
-모서리에 작게 띄우고 싶으면 설정에서 바꿀 수 있습니다.
-
-**둘. 볼 때까지 기다립니다.** 키보드·마우스 입력이 20초 이상 없으면 자리에
-없는 것으로 보고 **그대로 띄워 둡니다.** 돌아와서 무언가를 건드리면 그때부터
-3초를 세고 사라집니다. 자리에 있을 때는 처음부터 3초입니다.
-
-```
-표시 #1 — 86% 남았어. 시작하자!
-대기 #1 — 자리에 없어 그대로 둡니다     ← 50초 동안 그대로
-해제 #1 — 돌아옴, 52초 기다림
-```
-
-재실 판정은 GNOME의 `org.gnome.Mutter.IdleMonitor` 를 씁니다.
-Electron의 `powerMonitor.getSystemIdleTime()` 은 X11의 XScreenSaver 확장에
-기대는데, GNOME Wayland에서는 입력을 전혀 보지 못해 **1분을 가만히 있어도
-0을 돌려줍니다.** 실측으로 확인했습니다. Mutter를 쓸 수 없는 환경에서는
-`powerMonitor` 로 물러납니다.
-
-화면이 잠겨 있으면 무조건 '자리에 없음'입니다. 그리고 아무리 기다려도
-30분을 넘기지 않습니다 — 감지가 어떤 이유로든 계속 '없음'을 돌려주면
-캐릭터가 영원히 남기 때문입니다.
-
-## 어디에 뜨나
-
-기본은 **모든 모니터** 한가운데입니다. `workArea` 기준이라 상단 패널이나
-독을 침범하지 않습니다.
-
-화면마다 창을 하나씩 만들어 같은 내용을 함께 띄웁니다. 3초 뒤 사라지므로
-화면이 여럿이어도 오래 거슬리지 않고, 화면이 하나뿐이면 어느 선택지든
-결과가 같습니다.
-
-> **어느 화면을 보고 있는지 알아낼 방법이 없습니다.** Wayland에서는 앱이
-> 마우스 위치도, 다른 창의 위치도 물어볼 수 없습니다. Electron은 XWayland의
-> 포인터를 읽는데, XWayland는 자기 창 위에 있을 때만 포인터를 봅니다.
-> 마우스가 네이티브 Wayland 창(GNOME Terminal, Tilix 등)으로 넘어가면 좌표가
-> **마지막 위치에 멈춥니다.**
->
-> 실측했습니다. 마우스를 다른 모니터에서 크게 움직이는 6초 동안
-> `XQueryPointer` 는 한 픽셀도 변하지 않았고, 그 좌표는 반대편 모니터에 있는
-> VS Code 창 안쪽이었습니다.
->
-> 그래서 **맞히는 대신 전부에 띄웁니다.** 맞힐 필요가 없으면 틀릴 일도
-> 없습니다. 한 화면에만 띄우고 싶으면 설정에서 고를 수 있습니다 — 목록에
-> 방향과 해상도가 나오므로 어느 모니터인지 알아볼 수 있습니다.
-
-기준을 **작업 중인 창**으로 바꾸면 편집기·터미널 창의 모서리에 붙습니다.
-다만 되는 경우가 제한적입니다.
-
-> **Wayland에서는 앱이 다른 창의 위치를 물어볼 수 없습니다.** 프로토콜이
-> 의도적으로 막아 둔 것이라 우회할 방법이 없습니다. XWayland로 뜬 창
-> (VS Code 등)만 `xwininfo` 로 조회됩니다. GNOME Terminal · Tilix · Ptyxis 같은
-> 네이티브 Wayland 터미널은 보이지 않습니다.
-
-그래서 창을 특정할 **적극적인 증거**가 있을 때만 창에 붙입니다 — 세션의
-작업 디렉터리 이름이 창 제목에 있어야 합니다. 증거가 없으면 화면 모서리로
-물러납니다.
-
-이 규칙이 없을 때 실제로 이런 일이 있었습니다. Tilix에서 작업 중이었는데
-Tilix가 X11 목록에 아예 없어서, 남은 유일한 후보인 **옆 모니터의 VS Code**에
-캐릭터가 떴습니다. '제일 그럴듯한 창'을 고르는 것은 틀린 창을 고르는 것과
-같습니다.
-
-네이티브 Wayland 터미널을 쓰면서 창 기준으로 붙이고 싶다면, 터미널을
-XWayland로 띄우면 됩니다.
-
-```
-GDK_BACKEND=x11 tilix
-```
-
-## 자동 시작
-
-XDG autostart 규격(`~/.config/autostart/*.desktop`)을 직접 씁니다. Electron의
-`setLoginItemSettings`는 리눅스에서 동작이 들쭉날쭉하지만, XDG는 GNOME·KDE·XFCE가
-모두 따릅니다.
-
-`X-GNOME-Autostart-Delay=8` 을 두는 이유: 로그인 직후에는 네트워크가 아직 붙지
-않아 첫 조회가 실패합니다. 몇 초 늦게 뜨면 그 실패를 아예 겪지 않습니다.
-
-`Exec=` 에는 **AppImage 파일 경로**를 적습니다. AppImage는 실행될 때마다
-임시 디렉터리로 풀리기 때문에, `process.execPath`(= `/tmp/.mount_xxxx/…`)를
-적으면 다음 로그인 때 없는 경로가 됩니다. 런처가 알려주는 `APPIMAGE` 를
-먼저 봅니다. AppImage를 다른 곳으로 옮겼다면 자동 시작을 껐다 켜세요.
-
-## 로그
-
-`~/.config/claude-usage-tracker/logs/app.log` (트레이 → 로그 열기)
-
-512KB를 넘으면 한 번 굴리고 이전 것 하나만 남깁니다. 배경에서 종일 떠 있는
-앱이라 로그가 무한정 자라면 안 됩니다.
-
-**토큰과 자격증명은 절대 남기지 않습니다.** 토큰처럼 보이는 조각은 넉넉히
-지웁니다 — 로그는 사용자가 남에게 보내며 도움을 청하는 파일입니다.
-
-## 세션 연동
-
-`--install-hooks` 를 한 번 실행하면 Claude Code의 `SessionStart` / `SessionEnd`
-훅에 등록됩니다. 이후 세션을 켜면 캐릭터가 나와 현재 사용량을 알려줍니다.
-
-훅은 세션 시작 경로에서 실행되므로 지키는 것이 분명합니다.
-
-- **절대 실패하지 않습니다.** 무슨 일이 있어도 종료 코드 0.
-- **절대 기다리지 않습니다.** 파일 하나 쓰고 끝 (실측 4ms).
-- **앱이 꺼져 있으면 아무 일도 하지 않습니다.** 스풀 디렉터리가 없으면 즉시 물러납니다.
-- node·socat 같은 것에 의존하지 않는 POSIX `sh` 스크립트입니다.
-
-설치기는 `~/.claude/settings.json` 에서 **우리가 넣은 것만** 건드립니다.
-직접 등록한 다른 훅과 설정은 그대로 보존되고, 제거하면 원래 상태로 돌아옵니다.
-
-나서지 않는 규칙도 있습니다. 사용자가 '시작했다'고 느끼지 않는 순간에는
-인사하지 않습니다.
-
-- `/clear`, 컴팩션으로 발생한 `SessionStart` 는 건너뜁니다.
-- 90초 안에 세션을 또 켜면 인사하지 않습니다 (여러 세션·재시작).
-- 세션 종료 요약은 사용량이 1%p 이상 늘었을 때만 나옵니다.
-
-출력 예:
-
-```
-Claude 사용량
-
-  5시간    █░░░░░░░░░░░░░░░░░░░     4% · 여유 · 리셋까지 3시간 51분
-  주간     ██░░░░░░░░░░░░░░░░░░    10% · 여유 · 리셋까지 5일 22시간
-
-  모델별 주간
-    Fable      ██░░░░░░░░░░    14% · 리셋까지 5일 22시간
-
-  종합: 여유
-```
-
-## 데이터 소스
-
-Claude Code의 `/usage` 가 사용하는 것과 같은 엔드포인트를 씁니다.
+It calls the same endpoint Claude Code itself uses:
 
 ```
 GET https://api.anthropic.com/api/oauth/usage
-Authorization: Bearer <token>
+Authorization: Bearer <token from ~/.claude/.credentials.json>
 anthropic-beta: oauth-2025-04-20
 ```
 
-토큰은 `~/.claude/.credentials.json` 의 `claudeAiOauth.accessToken` 을 읽습니다.
-별도 설정이 필요 없고, 토큰 갱신은 Claude Code가 알아서 합니다.
+The response carries real utilization percentages for the five-hour window, the
+seven-day window, and any model-scoped limits — not token counts you have to
+convert yourself.
 
-> `~/.claude/projects/**/*.jsonl` 트랜스크립트에는 **토큰 수**만 있어서
-> "한도 대비 몇 퍼센트"를 계산할 수 없습니다. 위 API가 유일한 정답 소스입니다.
+**Your token never leaves your machine and is never written to a log.** The
+logger scrubs anything that looks like a credential, deliberately over-eagerly,
+because a log file is something you send to a stranger when you ask for help.
 
-**토큰은 로그·에러 메시지 어디에도 남기지 않습니다.**
+## Configuration
 
-## 캐릭터
+Tray → *Settings*, or `~/.config/claude-usage-tracker/settings.json`.
 
-Claude Code의 마스코트 **Claw'd** 입니다. 몸통은 원본 아트워크에서 픽셀 단위로
-그대로 옮겼습니다 — 16×10 격자, 코랄 단색, 외곽선도 음영도 없습니다.
-
-```
-..############..   머리
-..############..
-..##o######o##..   눈 — 한 칸 폭 세로 슬릿
-..##o######o##..
-################   팔이 좌우로 뻗은 밴드
-################
-..############..
-..############..
-...#.#....#.#...   다리 넷
-...#.#....#.#...
-```
-
-이 표는 테스트에 그대로 들어 있습니다. 몸통 렌더링이 여기서 벗어나면 실패합니다.
-
-캔버스는 24×16으로 더 넓습니다. 몸이 커서가 아니라 **액세서리 자리** 때문입니다 —
-머리 위 느낌표, 옆으로 흐르는 땀, 기절했을 때 도는 별.
-
-### 표정
-
-| 표정 | 눈 | 팔 | 액세서리 | 쓰이는 곳 |
-|---|---|---|---|---|
-| `idle` | 슬릿 2칸 | 제자리 | — | 기본 |
-| `blink` | 슬릿 1칸(아래) | 제자리 | — | 4.2초마다 깜박 |
-| `happy` | `^^` | 살짝 듦 | — | 여유 있을 때 |
-| `talk` | 슬릿 2칸 | 번갈아 듦 | — | 50% 돌파 |
-| `wave` | 슬릿 2칸 | 한쪽 번쩍 | — | 세션 시작 인사 |
-| `worry` | 슬릿 2칸(처짐) | 축 처짐 | 식은땀 1 | **70% 돌파** |
-| `alert` | 흰자+눈동자 | 살짝 듦 | 느낌표 + 땀 1 | **90% 돌파** |
-| `panic` | 흰자 크게 | 두 팔 번쩍 | 땀 2 + 떨림 | 위험 상태로 세션 시작 |
-| `faint` | `××` | 늘어짐 | 별 + 주저앉음 | **100% 소진** |
-
-단계마다 **신호가 하나씩 더해집니다**. 표정만 바뀌면 무엇이 달라졌는지
-알아채기 어렵기 때문입니다 — 70%에 땀이 생기고, 90%에 느낌표가 붙고,
-100%에 눈이 ×가 되며 주저앉습니다.
-
-색이 늘어나는 곳은 몸이 아니라 표정과 액세서리뿐입니다. 몸은 여전히 코랄
-단색이고, 흰자·땀(하늘색)·느낌표(노랑)·별만 색을 가집니다.
-
-원본과 다른 점은 하나입니다. 원본에서 눈은 배경이 비치는 구멍이지만,
-이 앱의 캐릭터는 어떤 바탕 위에 뜰지 알 수 없어 어두운 색으로 메웁니다.
-
-`npm run sprites` 로 전체 프레임을 시트로 뽑아 볼 수 있습니다.
-
-## 구조
-
-```
-src/core/                  헤드리스 코어 (UI 의존성 없음)
-  types.ts                 API 응답 타입 + 내부 스냅샷 타입
-  credentials.ts           ~/.claude/.credentials.json 로더
-  usage-api.ts             API 호출 + 정규화
-  thresholds.ts            50/70/90/100% 발화 판정 (순수 함수)
-  state-store.ts           발화 이력 영속화 (원자적 쓰기)
-  poller.ts                주기 폴링 + 지수 백오프
-  format.ts                사람이 읽는 문자열
-
-src/shared/
-  pixel/grid.ts            픽셀 그리기 프리미티브 (원·삼각형·광선·윤곽선)
-  pixel/png.ts             최소 PNG 인코더 (도구/아이콘용)
-  character/palette.ts     팔레트 (몸·눈·흰자·땀·느낌표·별)
-  character/sprites.ts     Claw'd 를 코드로 그린다
-  character/animator.ts    프레임 재생 + 눈 깜박임
-  character/script.ts      표정과 대사
-  ipc.ts                   메인 ↔ 렌더러 계약
-
-src/hooks/
-  hook-script.ts           훅이 실행하는 POSIX sh 스크립트
-  install.ts               settings.json 병합/제거 (우리 것만 건드린다)
-
-src/main/                  Electron 메인
-  overlay-window.ts        투명·클릭통과·항상위 창 + 배치 계산
-  overlay-host.ts          화면마다 창을 하나씩 관리
-  overlay-controller.ts    표시 큐 (겹침 방지, 심각도 우선순위)
-  capture-window.ts        문서용 스크린샷 전용 오프스크린 창
-  event-spool.ts           훅 이벤트 수신 (파일 드롭 + watch/스윕)
-  session-greeter.ts       언제 인사하고 언제 나서지 않을지
-  tray.ts                  트레이 아이콘 + 메뉴
-  tray-icon.ts             캐릭터에서 트레이 아이콘을 생성
-  settings-store.ts        설정 영속화 + 변경 구독
-  settings-window.ts       설정 창과 IPC
-  autostart.ts             XDG autostart .desktop
-  logger.ts                회전 로그 (토큰 마스킹)
-src/preload/               contextBridge
-src/renderer/              캔버스 캐릭터 + 말풍선
-src/cli/                   헤드리스 검증 CLI
-
-tools/
-  preview-sprites.ts       스프라이트 시트 미리보기
-  make-icons.ts            캐릭터에서 앱 아이콘 생성 (패키징 직전)
-  check-transparency.cjs   오버레이 투명도 검사
-
-electron-builder.yml       AppImage 패키징
-azure-pipelines.yml        CI(검사) + 릴리스(태그 → AppImage)
-docs/                      README에 쓰는 장면 스크린샷 (npm run shots)
-```
-
-## 투명
-
-오버레이는 캐릭터와 말풍선만 그립니다. 창 배경은 완전히 투명해서, 어떤
-바탕 위에 떠도 검은 사각형이 생기지 않습니다.
-
-이 속성은 조용히 깨집니다 — `body`에 `background` 한 줄이 들어가거나 창 옵션
-하나가 바뀌면, 캐릭터 대신 검은 상자가 화면에 뜹니다. 그런데 단위 테스트로는
-잡히지 않습니다. 실제로 창을 띄워 알파 채널을 봐야 알 수 있습니다.
-
-```
-npm run check:transparency
-  380x250
-    불투명 17.1%  투명 82.0%  검정 0
-  ✓ 캐릭터와 말풍선만 그려집니다
-```
-
-> 문서의 오버레이 스크린샷에 어두운 배경이 보이는 것은 **캡처 전용**입니다.
-> `capturePage` 는 투명 창을 통째로 투명하게 찍기 때문에, 배치와 색을 눈으로
-> 확인하려고 캡처 모드에서만 임시 배경을 깝니다. 실제 실행에는 들어가지 않습니다.
-
-## 오버레이가 지키는 것
-
-작업을 방해하지 않는 것이 이 앱의 전제입니다.
-
-- 기본적으로 **클릭을 통과**시킵니다. 말풍선 위에 마우스가 올라왔을 때만 받습니다.
-- **포커스를 훔치지 않습니다** (`showInactive` + `focusable: false`). 타이핑 중에 떠도 글자를 가로채지 않습니다.
-- 작업표시줄에 뜨지 않고, 전체화면 앱 위에도 표시됩니다.
-- 알림이 몰려도 **하나씩** 나옵니다. 더 심각한 소식이 먼저 나옵니다.
-
-## 패키징
-
-AppImage 하나로 냅니다. deb/rpm처럼 시스템에 자리를 잡는 대신, 파일 하나
-받아 실행 권한만 주면 되는 쪽이 '사용량이 궁금해서 잠깐 써보는' 첫 만남에
-맞습니다. 배포판도 가리지 않고 설치 권한도 필요 없습니다.
-
-```bash
-npm run package    # build → icons → electron-builder → release/*.AppImage
-```
-
-**크기** — 받는 파일은 약 70MiB입니다. 대부분이 Electron이고 우리 코드는
-asar 131KB입니다. 빈 Electron 앱을 같은 설정으로 빌드하면 72.8MiB가 나오므로,
-사실상 하한에서 더 깎아낸 상태입니다.
-
-| 한 일 | 효과 |
-|---|---|
-| `electronLanguages: [ko, en-US]` | 로케일 55개 → 2개, 40MB → 1MB |
-| `compression: maximum` | squashfs 압축 강화 |
-| `afterPack: tools/trim-runtime.cjs` | 안 쓰는 런타임 부품 9.2MB 제거 |
-
-합쳐서 108MB → 70MiB. 더 줄이려면 Electron을 벗어나야 하는데(Tauri 등
-시스템 WebView 사용, 3~10MB), 투명·클릭통과·항상위·트레이를 전부 다시
-검증해야 하는 일이라 지금 단계의 일이 아닙니다.
-
-아이콘은 리포에 두지 않고 패키징 직전에 **캐릭터에서 새로 그립니다**
-(`tools/make-icons.ts`). 트레이 아이콘과 같은 이유입니다 — 커밋된 PNG는
-캐릭터가 바뀔 때 동기화를 사람이 기억해야 합니다. 런처에서는 아이콘끼리
-붙어 보이지 않아야 해서 8%를 비웁니다.
-
-## CI / 릴리스
-
-`azure-pipelines.yml` — 두 단계입니다.
-
-| 단계 | 언제 | 무엇 |
+| Setting | Default | Range |
 |---|---|---|
-| Verify | 모든 푸시 · PR | lint → typecheck → test → build |
-| Package | `v*` 태그 | 버전 확인 → AppImage → 아티팩트 |
+| Alert thresholds | 50, 70, 90, 100 | 1–100, auto-sorted and de-duplicated |
+| Hold time when you're looking | 3s | 1–30s |
+| Wait if you're away | on | |
+| Poll interval | 60s | 15–600s |
+| Show on screen | on | off = tray only |
+| Which monitor | all | all / primary / cursor / specific |
+| Anchor | screen center (large) | center / screen corner / active window |
+| Corner | top-left | four corners (ignored in center mode) |
+| Edge margin | 24px | 0–200px |
+| Greet on session start | on | |
+| Start on login | off | XDG autostart |
 
-나눈 이유: 검사는 매번 돌아야 하지만 패키징은 100MB를 만들어 내는 일이라
-릴리스할 때만 돕니다. Verify가 실패하면 Package는 시작하지 않습니다.
+## Comparison
 
-릴리스하려면 `package.json` 버전을 올리고 같은 이름의 태그를 밉니다.
+| | This app | Bar-chart dashboards | `/status` in the CLI |
+|---|---|---|---|
+| Tells you unprompted | **yes** | no | no |
+| Works while you're in another app | **yes** | no | no |
+| Waits until you're at the keyboard | **yes** | n/a | n/a |
+| Multi-monitor | **all screens** | n/a | n/a |
+| Reads official usage API (real %) | **yes** | varies | yes |
+
+## Build from source
 
 ```bash
-npm version 0.2.0    # package.json + 태그 v0.2.0
-git push --follow-tags
+npm install
+npm run dev        # run with live usage polling
+npm run demo       # replay the 50/70/90/100 scenes, 8s apart
+npm test           # 306 tests
+npm run package    # build the AppImage into release/
 ```
 
-Package 단계가 태그와 `package.json` 버전이 같은지 먼저 확인하고, 다르면
-빌드를 시작하기 전에 멈춥니다. 어긋난 채로 릴리스가 나가면 나중에 어느
-쪽이 맞는지 알 수 없기 때문입니다.
+The download is ~70 MiB. Almost all of that is Electron — the application code
+is a 131 KB asar. An empty Electron app built with the same settings comes to
+72.8 MiB, so this is already below the stock floor: unused locales, the crash
+handler and the SwiftShader software renderer are stripped at package time. See
+[README.ko.md](README.ko.md#패키징) for the full accounting.
 
-## 개발
+## How it's built
 
-```bash
-npm test           # vitest
-npm run typecheck
-npm run lint
-```
+- **Electron + TypeScript**, no UI framework
+- The character is **drawn in code**, not shipped as image assets — a pixel grid
+  primitive plus a minimal PNG encoder, so the tray icon and the app icon are
+  both generated from the same sprite at build time and can never drift
+- Headless core (`src/core/`) with no UI dependency, so usage polling, threshold
+  evaluation and state persistence are all testable without a display
 
-## 라이선스
+## FAQ
 
-Private.
+**Does it work on macOS or Windows?**
+Not yet. The overlay, autostart and idle detection are written against Linux/XDG
+and GNOME interfaces. The core is portable; the shell is not.
+
+**Does it need my API key?**
+No. It reuses the OAuth token Claude Code already stored. If you're signed in to
+Claude Code, you're done.
+
+**Does it cost tokens to check my usage?**
+No. The usage endpoint is metadata, not inference.
+
+**Will it interrupt me?**
+It draws a click-through overlay that never takes focus, and it disappears after
+3 seconds. If you're away it waits rather than showing to an empty chair.
+
+**Why a character instead of a notification?**
+Desktop notifications are the thing you have trained yourself to ignore. That is
+precisely the wrong medium for "you are about to lose your working session."
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+---
+
+<sub>Keywords: Claude usage tracker, Claude Code usage monitor, Claude usage
+limit notifier, Claude 5-hour limit, Claude weekly limit, Anthropic usage API,
+Claude desktop app Linux, Claude usage AppImage, Claude rate limit alert.</sub>

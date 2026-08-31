@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://hosungju.github.io/claude-usage-tracker/sitemap.xml

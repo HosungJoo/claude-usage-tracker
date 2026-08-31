@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Claude Usage Tracker — Desktop Usage Monitor for Claude Code (Linux)</title>
+<meta name="description" content="A pixel Claude character that tells you your Claude usage before you ask. Linux tray app that reads the official Claude usage API and alerts you at 50%, 70%, 90% and 100% of your five-hour and weekly limits. Free, open source, one AppImage.">
+<link rel="canonical" href="https://hosungju.github.io/claude-usage-tracker/">
+
+<meta name="keywords" content="claude usage tracker, claude code usage monitor, claude usage limit, claude 5-hour limit, claude weekly limit, anthropic usage api, claude desktop app linux, claude rate limit alert, claude usage appimage">
+<meta name="author" content="HosungJu">
+<meta name="robots" content="index, follow, max-image-preview:large">
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://hosungju.github.io/claude-usage-tracker/">
+<meta property="og:title" content="Claude Usage Tracker — it tells you before you ask">
+<meta property="og:description" content="A pixel Claude character pops up at 50/70/90/100% of your Claude usage limits. Linux tray app, official usage API, one AppImage.">
+<meta property="og:image" content="https://hosungju.github.io/claude-usage-tracker/greeting.png">
+<meta property="og:image:alt" content="Pixel Claude character showing remaining Claude usage in a speech bubble">
+<meta property="og:site_name" content="Claude Usage Tracker">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Claude Usage Tracker — it tells you before you ask">
+<meta name="twitter:description" content="A pixel Claude character pops up at 50/70/90/100% of your Claude usage limits. Linux tray app, official usage API.">
+<meta name="twitter:image" content="https://hosungju.github.io/claude-usage-tracker/greeting.png">
+
+<link rel="icon" href="icon.png" type="image/png">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Claude Usage Tracker",
+  "applicationCategory": "DeveloperApplication",
+  "applicationSubCategory": "System Monitor",
+  "operatingSystem": "Linux",
+  "url": "https://hosungju.github.io/claude-usage-tracker/",
+  "downloadUrl": "https://github.com/HosungJu/claude-usage-tracker/releases/latest",
+  "softwareVersion": "0.1.1",
+  "fileSize": "70MB",
+  "description": "A pixel Claude character that tells you your Claude usage before you ask. Reads the official Claude usage API and appears on screen at 50%, 70%, 90% and 100% of your five-hour and weekly limits.",
+  "license": "https://opensource.org/licenses/MIT",
+  "author": { "@type": "Person", "name": "HosungJu" },
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "screenshot": "https://hosungju.github.io/claude-usage-tracker/greeting.png"
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How do I check my Claude usage on Linux?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Claude Usage Tracker runs in your system tray, polls the official Claude usage API, and shows a character on screen when you cross 50%, 70%, 90% or 100% of your five-hour or weekly limit. You do not have to open anything." }
+    },
+    {
+      "@type": "Question",
+      "name": "Does Claude Usage Tracker need an API key?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No. It reuses the OAuth token Claude Code already stored in ~/.claude/.credentials.json. If you are signed in to Claude Code, there is nothing to configure. The token never leaves your machine and is never written to a log." }
+    },
+    {
+      "@type": "Question",
+      "name": "Does checking Claude usage cost tokens?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No. The usage endpoint returns account metadata, not model inference, so polling it does not consume any of your quota." }
+    },
+    {
+      "@type": "Question",
+      "name": "What are the Claude five-hour and weekly limits?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Claude subscriptions meter usage over a rolling five-hour session window and a seven-day window. The usage API reports utilization as a percentage for each, plus any model-scoped limits, along with the time each one resets." }
+    }
+  ]
+}
+</script>
+
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --panel: #ffffff;
+    --ink: #1f1c1a;
+    --muted: #6b635c;
+    --line: #e6e0d8;
+    --brand: #d1795a;
+    --brand-ink: #a4553a;
+    --ok: #3f9e6d;
+    --warn: #d9a441;
+    --crit: #d8574f;
+    --code-bg: #f4f1ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #16130f;
+      --panel: #1f1b17;
+      --ink: #f2ece4;
+      --muted: #a79c92;
+      --line: #332c25;
+      --brand: #e08b6a;
+      --brand-ink: #f0a583;
+      --code-bg: #241f1a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #16130f; --panel: #1f1b17; --ink: #f2ece4; --muted: #a79c92;
+    --line: #332c25; --brand: #e08b6a; --brand-ink: #f0a583; --code-bg: #241f1a;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", "Noto Sans KR", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+  a { color: var(--brand-ink); }
+
+  header { padding: 72px 0 48px; text-align: center; }
+  h1 {
+    margin: 0 0 12px;
+    font-size: clamp(2rem, 5.5vw, 3rem);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+  .tagline {
+    margin: 0 auto 8px;
+    max-width: 34ch;
+    font-size: clamp(1.05rem, 2.6vw, 1.3rem);
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .sub {
+    margin: 0 auto 28px;
+    max-width: 56ch;
+    color: var(--muted);
+  }
+
+  .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-block;
+    padding: 12px 22px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    border: 1px solid transparent;
+  }
+  .btn-primary { background: var(--brand); color: #fff; }
+  .btn-primary:hover { background: var(--brand-ink); }
+  .btn-ghost { border-color: var(--line); color: var(--ink); background: var(--panel); }
+  .meta { margin-top: 14px; font-size: 0.85rem; color: var(--muted); }
+
+  figure { margin: 40px 0; }
+  img { max-width: 100%; height: auto; display: block; border-radius: 10px; }
+  figcaption { margin-top: 10px; font-size: 0.85rem; color: var(--muted); text-align: center; }
+
+  section { padding: 40px 0; border-top: 1px solid var(--line); }
+  h2 { font-size: 1.5rem; letter-spacing: -0.01em; margin: 0 0 8px; }
+  h3 { font-size: 1.05rem; margin: 0 0 6px; }
+  .lede { color: var(--muted); margin: 0 0 24px; }
+
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px;
+  }
+  .card p { margin: 0; color: var(--muted); font-size: 0.94rem; }
+
+  .shots { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 0.88rem;
+  }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  th { font-weight: 600; }
+  td.yes { color: var(--ok); font-weight: 600; }
+  td.no { color: var(--muted); }
+
+  details {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    background: var(--panel);
+  }
+  summary { cursor: pointer; font-weight: 600; }
+  details p { color: var(--muted); margin: 10px 0 0; }
+
+  footer {
+    padding: 40px 0 64px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.88rem;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header>
+  <h1>Claude Usage Tracker</h1>
+  <p class="tagline">It tells you before you ask.</p>
+  <p class="sub">
+    A pixel Claude character that appears on your screen when you hit 50%, 70%,
+    90% and 100% of your Claude usage limits. Linux tray app, official usage
+    API, one file to download.
+  </p>
+  <div class="cta">
+    <a class="btn btn-primary" href="https://github.com/HosungJu/claude-usage-tracker/releases/latest">Download AppImage</a>
+    <a class="btn btn-ghost" href="https://github.com/HosungJu/claude-usage-tracker">View on GitHub</a>
+  </div>
+  <p class="meta">Free and open source (MIT) · ~70 MiB · Linux x86-64 · no account, no API key</p>
+</header>
+
+<figure>
+  <img src="greeting.png" width="880" height="520"
+       alt="Claude Usage Tracker greeting overlay showing remaining Claude usage with five-hour and weekly gauges">
+  <figcaption>What you see when a Claude Code session starts — unprompted.</figcaption>
+</figure>
+
+<section>
+  <h2>The problem with every other usage tool</h2>
+  <p class="lede">
+    They all have the same shape: a bar chart you have to open, or a number you
+    have to hover over. Which means <strong>you only learn your usage when you
+    already thought to check</strong> — and the moment that actually matters is
+    the one where you weren't looking, mid-refactor, about to lose your session.
+  </p>
+  <p class="lede" style="margin-bottom:0">
+    This inverts it. The app sits in your tray, polls the usage API, and when
+    you cross a threshold the character comes to you. You do nothing.
+  </p>
+</section>
+
+<section>
+  <h2>What it does</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Tells you first</h3>
+      <p>Appears at 50 / 70 / 90 / 100% of your five-hour and weekly limits. Thresholds are configurable.</p>
+    </div>
+    <div class="card">
+      <h3>Waits until you're there</h3>
+      <p>If you're away from the keyboard or the screen is locked, it holds the message. An alert you didn't see didn't happen.</p>
+    </div>
+    <div class="card">
+      <h3>Every monitor</h3>
+      <p>On Wayland an app can't ask where you're looking. So it doesn't guess — it draws on all screens. You can't be wrong if you don't guess.</p>
+    </div>
+    <div class="card">
+      <h3>Session greetings</h3>
+      <p>Optional Claude Code <code>SessionStart</code> hook: know what's left before you begin.</p>
+    </div>
+    <div class="card">
+      <h3>Never in the way</h3>
+      <p>Transparent click-through overlay. No taskbar entry, never steals focus, gone in 3 seconds.</p>
+    </div>
+    <div class="card">
+      <h3>Tray at a glance</h3>
+      <p>The tray icon is generated from the character and changes expression with your usage level.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>As the limit approaches</h2>
+  <div class="shots">
+    <figure style="margin:0">
+      <img src="threshold-90.png" width="880" height="520"
+           alt="Claude usage at 90 percent — character looking worried with a red five-hour gauge">
+      <figcaption>90% — worried</figcaption>
+    </figure>
+    <figure style="margin:0">
+      <img src="threshold-100.png" width="880" height="520"
+           alt="Claude usage limit reached at 100 percent — character fainted, showing reset time">
+      <figcaption>100% — out, with the reset time</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section>
+  <h2>Install</h2>
+  <p class="lede">One file. No installer, no root, no package manager.</p>
+<pre><code>chmod +x claude-usage-tracker-*-x86_64.AppImage
+./claude-usage-tracker-*-x86_64.AppImage</code></pre>
+  <p class="lede" style="margin-bottom:0">
+    No window opens — that's correct. Look for the tray icon; a window-less tray
+    app is this program's normal state. To uninstall, delete the file and
+    <code>~/.config/claude-usage-tracker/</code>.
+  </p>
+</section>
+
+<section>
+  <h2>How it reads your usage</h2>
+  <p class="lede">It calls the same endpoint Claude Code itself uses:</p>
+<pre><code>GET https://api.anthropic.com/api/oauth/usage
+Authorization: Bearer &lt;token from ~/.claude/.credentials.json&gt;
+anthropic-beta: oauth-2025-04-20</code></pre>
+  <p class="lede">
+    The response carries real utilization percentages for the five-hour window,
+    the seven-day window and any model-scoped limits — not token counts you have
+    to convert yourself.
+  </p>
+  <p class="lede" style="margin-bottom:0">
+    <strong>Your token never leaves your machine and is never written to a
+    log.</strong> The logger scrubs anything resembling a credential,
+    deliberately over-eagerly, because a log file is what you send to a stranger
+    when you ask for help.
+  </p>
+</section>
+
+<section>
+  <h2>Compared with the alternatives</h2>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>&nbsp;</th><th>This app</th><th>Bar-chart dashboards</th><th><code>/status</code> in the CLI</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Tells you unprompted</td><td class="yes">yes</td><td class="no">no</td><td class="no">no</td></tr>
+        <tr><td>Works while you're in another app</td><td class="yes">yes</td><td class="no">no</td><td class="no">no</td></tr>
+        <tr><td>Waits until you're at the keyboard</td><td class="yes">yes</td><td class="no">—</td><td class="no">—</td></tr>
+        <tr><td>Multi-monitor</td><td class="yes">all screens</td><td class="no">—</td><td class="no">—</td></tr>
+        <tr><td>Official usage API (real %)</td><td class="yes">yes</td><td class="no">varies</td><td class="yes">yes</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>Questions</h2>
+
+  <details>
+    <summary>How do I check my Claude usage on Linux?</summary>
+    <p>Install this app. It runs in your tray, polls the official usage API and
+    shows a character on screen when you cross 50%, 70%, 90% or 100% of your
+    five-hour or weekly limit. You don't have to open anything.</p>
+  </details>
+
+  <details>
+    <summary>Does it need an API key?</summary>
+    <p>No. It reuses the OAuth token Claude Code already stored in
+    <code>~/.claude/.credentials.json</code>. If you're signed in to Claude
+    Code, there's nothing to configure.</p>
+  </details>
+
+  <details>
+    <summary>Does checking usage cost tokens?</summary>
+    <p>No. The usage endpoint returns account metadata, not model inference, so
+    polling it consumes none of your quota.</p>
+  </details>
+
+  <details>
+    <summary>What are the five-hour and weekly limits?</summary>
+    <p>Claude subscriptions meter usage over a rolling five-hour session window
+    and a seven-day window. The usage API reports utilization as a percentage
+    for each, plus any model-scoped limits, along with when each one resets.</p>
+  </details>
+
+  <details>
+    <summary>Does it work on macOS or Windows?</summary>
+    <p>Not yet. The overlay, autostart and idle detection are written against
+    Linux/XDG and GNOME interfaces. The core is portable; the shell is not.</p>
+  </details>
+
+  <details>
+    <summary>Will it interrupt me?</summary>
+    <p>It draws a click-through overlay that never takes focus and disappears
+    after 3 seconds. If you're away it waits rather than showing to an empty
+    chair.</p>
+  </details>
+
+  <details>
+    <summary>Why a character instead of a desktop notification?</summary>
+    <p>Desktop notifications are the thing you have trained yourself to ignore.
+    That's precisely the wrong medium for "you are about to lose your working
+    session."</p>
+  </details>
+</section>
+
+<footer>
+  <p>
+    <a href="https://github.com/HosungJu/claude-usage-tracker">GitHub</a> ·
+    <a href="https://github.com/HosungJu/claude-usage-tracker/releases/latest">Releases</a> ·
+    <a href="https://github.com/HosungJu/claude-usage-tracker/blob/master/README.ko.md">한국어</a>
+  </p>
+  <p>MIT licensed. Not affiliated with Anthropic.</p>
+</footer>
+
+</div>
+</body>
+</html>
