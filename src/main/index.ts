@@ -22,6 +22,7 @@ import { applyAutostart } from './autostart.js';
 import { findWorkingWindow } from './window-anchor.js';
 import { overlaySizeFor, type OverlayPlacement } from './overlay-window.js';
 import { resolveTargets, WindowOverlayHost } from './overlay-host.js';
+import { applyLocale, t } from '../shared/i18n/index.js';
 import { captureScene, openCaptureWindow } from './capture-window.js';
 import type { Severity, UsageResponse, UsageSnapshot } from '../core/types.js';
 import type { Settings } from '../shared/settings.js';
@@ -50,6 +51,15 @@ let subscription: string | null = null;
 /** 실제 API 없이 연출만 확인하는 개발 모드. */
 const DEMO = process.argv.includes('--demo');
 const CAPTURE = process.argv.find((a) => a.startsWith('--capture='))?.slice('--capture='.length);
+/**
+ * 캡처할 언어. 문서 스크린샷을 언어별로 뽑을 때 쓴다.
+ *
+ * 설정 파일을 고쳤다 되돌리는 대신 인자로 받는다 — 스크린샷을 뽑는 일이
+ * 사용자의 설정을 건드리는 일이 되면 안 된다.
+ */
+const CAPTURE_LANG = process.argv
+  .find((a) => a.startsWith('--lang='))
+  ?.slice('--lang='.length);
 
 /**
  * 한 화면에 대한 배치.
@@ -111,20 +121,25 @@ async function applyPlacement(cwd: string | null = null): Promise<void> {
     if (found) {
       anchorRect = { x: found.x, y: found.y, width: found.width, height: found.height };
     } else {
-      logger.info('작업 중인 창을 찾지 못해 화면 기준으로 띄웁니다.');
+      logger.info(t().log.windowNotFound);
     }
   }
 
   const targets = overlayTargets();
+  const log = t().log;
   const where =
-    store.value.anchor === 'center' ? '한가운데' : anchorRect ? '창 모서리' : '화면 모서리';
+    store.value.anchor === 'center'
+      ? log.placementCenter
+      : anchorRect
+        ? log.placementWindowCorner
+        : log.placementScreenCorner;
   const at = targets
     .map((t) => {
       const b = computeBoundsFor(t.placement);
       return `(${b.x}, ${b.y})`;
     })
     .join(' ');
-  logger.info(`배치 — ${where} · 화면 ${targets.length}개 → ${at}`);
+  logger.info(log.placement(where, targets.length, at));
 }
 
 /** 캐릭터를 띄운다. 설정에서 껐으면 아무 일도 하지 않는다. */
@@ -204,14 +219,16 @@ function startPolling(): void {
   });
 
   poller.on('threshold', (event, snapshot) => {
-    logger.info(`임계값 ${event.threshold}% 돌파 (${event.window} ${event.percent}%)`);
+    logger.info(
+      t().log.thresholdCrossed(event.threshold, event.window, `${event.percent}%`),
+    );
     present(lineForThreshold(event, snapshot.fetchedAt), event.severity, snapshot);
   });
 
   poller.on('error', (_err, message, willRetry) => {
     lastError = message;
     tray?.setError(message);
-    logger.warn(`${message}${willRetry ? ' (재시도합니다)' : ''}`);
+    logger.warn(`${message}${willRetry ? t().log.willRetry : ''}`);
   });
 
   void poller.start();
@@ -225,8 +242,16 @@ function startPolling(): void {
  */
 function onSettingsChanged(next: Settings, prev: Settings): void {
   if (next.pollIntervalSec !== prev.pollIntervalSec || next.thresholds.join() !== prev.thresholds.join()) {
-    logger.info(`폴링 설정 변경 — ${next.pollIntervalSec}초, 임계값 ${next.thresholds.join('/')}`);
+    logger.info(
+      t().log.pollSettingsChanged(next.pollIntervalSec, next.thresholds.join('/')),
+    );
     startPolling();
+  }
+
+  if (next.language !== prev.language) {
+    applyLocale(next.language, app.getLocale());
+    // 트레이 메뉴와 툴팁은 이미 그려져 있다. 새 언어로 다시 그린다.
+    if (lastSnapshot) tray?.update(lastSnapshot);
   }
 
   if (next.holdSec !== prev.holdSec || next.waitWhenAway !== prev.waitWhenAway) {
@@ -244,7 +269,13 @@ function onSettingsChanged(next: Settings, prev: Settings): void {
 
   if (next.autostart !== prev.autostart) {
     void applyAutostart(next.autostart, { exec: autostartCommand() }).then((ok) => {
-      logger.info(ok ? `자동 시작 ${next.autostart ? '켜짐' : '꺼짐'}` : '자동 시작 설정 실패');
+      logger.info(
+        ok
+          ? next.autostart
+            ? t().log.autostartOn
+            : t().log.autostartOff
+          : t().log.autostartFailed,
+      );
     });
   }
 }
@@ -282,7 +313,7 @@ function startSessionHooks(): void {
   spool = new EventSpool((event) => void greeter?.handle(event));
 
   void spool.start().catch((e: unknown) => {
-    logger.error(`이벤트 수신을 시작하지 못했습니다: ${e instanceof Error ? e.message : String(e)}`);
+    logger.error(t().log.spoolFailed(e instanceof Error ? e.message : String(e)));
   });
 }
 
@@ -294,7 +325,7 @@ function startSessionHooks(): void {
 async function checkNow(): Promise<void> {
   const snapshot = (await poller?.refreshNow()) ?? lastSnapshot;
   if (!snapshot) {
-    logger.warn('지금 확인: 사용량을 읽지 못했습니다.');
+    logger.warn(t().log.checkNowFailed);
     return;
   }
   present(lineForManualCheck(snapshot, snapshot.fetchedAt), snapshot.severity, snapshot);
@@ -447,9 +478,9 @@ async function captureHookFlow(dir: string): Promise<void> {
   for (const win of host?.allWindows() ?? []) {
     await win.webContents.insertCSS('body { background: #1e1e1e !important; }');
   }
-  console.log('hook-capture: 확인용 배경을 깔았습니다 — 화면에 어둡게 보입니다');
+  console.log('hook-capture: temporary background applied — the overlay will look dark on screen');
   const shot = host?.anyWindow() ?? null;
-  console.log(`hook-capture ready: ${spool?.directory ?? '(스풀 없음)'}`);
+  console.log(`hook-capture ready: ${spool?.directory ?? '(no spool)'}`);
 
   for (let i = 0; i < 40; i++) {
     await new Promise((r) => setTimeout(r, 500));
@@ -476,13 +507,15 @@ if (!app.requestSingleInstanceLock()) {
 
   void app.whenReady().then(async () => {
     let prev = await store.load();
+    // 무엇을 로그에 쓰기 전에 언어부터 정한다. 첫 줄부터 사용자의 말이어야 한다.
+    applyLocale(CAPTURE_LANG === 'ko' || CAPTURE_LANG === 'en' ? CAPTURE_LANG : prev.language, app.getLocale());
     store.subscribe((next) => {
       const before = prev;
       prev = next;
       onSettingsChanged(next, before);
     });
 
-    logger.info(`시작 — 임계값 ${prev.thresholds.join('/')}, ${prev.pollIntervalSec}초 주기`);
+    logger.info(t().log.started(prev.thresholds.join('/'), prev.pollIntervalSec));
 
     createOverlay();
     watchDisplays();
@@ -516,7 +549,7 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.on('before-quit', () => {
-    logger.info('종료합니다.');
+    logger.info(t().log.quitting);
     poller?.stop();
     controller?.clear();
     host?.destroy();

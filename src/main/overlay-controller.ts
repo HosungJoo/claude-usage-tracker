@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import type { OverlaySize } from './overlay-window.js';
 import type { OverlayHost } from './overlay-host.js';
 import { isUserPresent } from './presence.js';
+import { t } from '../shared/i18n/index.js';
 import type { Line } from '../shared/character/script.js';
 import { IPC, type GaugeInfo, type ShowRequest } from '../shared/ipc.js';
 import type { Corner } from './overlay-window.js';
@@ -180,7 +181,7 @@ export class OverlayController {
     this.host.show(req);
 
     this.shownAt = Date.now();
-    this.log(`표시 #${next.id} — ${next.line.title}`);
+    this.log(t().log.shown(next.id, next.line.title));
     this.startHoldWatch(next.id);
   }
 
@@ -195,7 +196,7 @@ export class OverlayController {
     this.clearHoldTimers();
 
     if (!this.policy.waitWhenAway) {
-      this.holdTimer = setTimeout(() => this.dismiss(id, '시간 경과'), this.policy.presentMs);
+      this.holdTimer = setTimeout(() => this.dismiss(id, t().log.releaseTimeout), this.policy.presentMs);
       return;
     }
 
@@ -205,7 +206,7 @@ export class OverlayController {
       if (this.showing?.id !== id) return;
 
       if (Date.now() - this.shownAt > MAX_WAIT_MS) {
-        this.dismiss(id, '최대 대기 시간 초과');
+        this.dismiss(id, t().log.releaseTimeout);
         return;
       }
 
@@ -215,15 +216,15 @@ export class OverlayController {
           // 아직 자리에 없다. 계속 띄워 둔 채로 다시 확인한다.
           if (!waited) {
             waited = true;
-            this.log(`대기 #${id} — 자리에 없어 그대로 둡니다`);
+            this.log(t().log.held(id));
           }
           this.presenceTimer = setTimeout(tick, PRESENCE_POLL_MS);
           return;
         }
         // 돌아왔다. 볼 시간을 주고 치운다.
         const reason = waited
-          ? `돌아옴, ${Math.round((Date.now() - this.shownAt) / 1000)}초 기다림`
-          : '시간 경과';
+          ? t().log.releaseReturned(Math.round((Date.now() - this.shownAt) / 1000))
+          : t().log.releaseTimeout;
         this.holdTimer = setTimeout(() => this.dismiss(id, reason), this.policy.presentMs);
       });
     };
@@ -234,7 +235,7 @@ export class OverlayController {
   /** 표시를 끝낸다. 이유를 남긴다. */
   private dismiss(id: number, reason: string): void {
     if (this.showing?.id !== id) return;
-    this.log(`해제 #${id} — ${reason}`);
+    this.log(t().log.released(id, reason));
     this.handleDismissed(null, id);
   }
 

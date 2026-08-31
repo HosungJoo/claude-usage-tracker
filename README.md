@@ -10,7 +10,7 @@ limit by being cut off mid-task.
 [![AppImage](https://img.shields.io/badge/AppImage-70%20MiB-blue)](https://github.com/HosungJu/claude-usage-tracker/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
-[한국어 문서 →](README.ko.md)
+[한국어 문서 →](README.ko.md) · [Website](https://hosungju.github.io/claude-usage-tracker/)
 
 ![Claude Usage Tracker greeting overlay](docs/greeting.png)
 
@@ -47,6 +47,10 @@ cross a threshold **the character comes to you.** You do nothing.
   never steals focus, gone in 3 seconds.
 - **Tray at a glance.** The tray icon is generated from the character itself and
   changes expression with your usage level.
+- **Speaks English or Korean.** Follows your desktop language by default; you can
+  pin either one in Settings. Every surface is translated — the character's lines,
+  the tray, the settings window, errors, the CLI, and the log file you would send
+  to someone for help.
 
 ## Install
 
@@ -70,7 +74,7 @@ session starts:
 npm run cli -- --install-hooks    # from a clone of this repo
 ```
 
-**Optional — start on login.** Tray → *설정… (Settings)* → *Start on login*.
+**Optional — start on login.** Tray → *Settings* → *Start on login*.
 Writes an XDG autostart entry.
 
 ## Requirements
@@ -116,6 +120,7 @@ Tray → *Settings*, or `~/.config/claude-usage-tracker/settings.json`.
 | Edge margin | 24px | 0–200px |
 | Greet on session start | on | |
 | Start on login | off | XDG autostart |
+| Language | system | System / English / 한국어 |
 
 ## Comparison
 
@@ -133,7 +138,7 @@ Tray → *Settings*, or `~/.config/claude-usage-tracker/settings.json`.
 npm install
 npm run dev        # run with live usage polling
 npm run demo       # replay the 50/70/90/100 scenes, 8s apart
-npm test           # 306 tests
+npm test           # 317 tests
 npm run package    # build the AppImage into release/
 ```
 

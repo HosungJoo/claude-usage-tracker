@@ -1,3 +1,4 @@
+import { t } from '../shared/i18n/index.js';
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -40,15 +41,15 @@ export class CredentialError extends Error {
 export function describeCredentialError(err: CredentialError): string {
   switch (err.code) {
     case 'not_found':
-      return 'Claude Code 자격증명을 찾을 수 없습니다. 터미널에서 `claude` 로 한 번 로그인해 주세요.';
+      return t().error.credentialsMissing;
     case 'permission_denied':
-      return '자격증명 파일을 읽을 권한이 없습니다. 파일 소유자와 권한(600)을 확인해 주세요.';
+      return t().error.credentialsUnreadable;
     case 'malformed':
-      return '자격증명 파일이 손상되었습니다. `claude` 로 다시 로그인하면 복구됩니다.';
+      return t().error.credentialsCorrupt;
     case 'missing_token':
-      return '자격증명에 OAuth 토큰이 없습니다. API 키 방식으로 로그인했다면 이 앱은 사용량을 조회할 수 없습니다.';
+      return t().error.credentialsNoToken;
     case 'expired':
-      return '토큰이 만료되었습니다. `claude` 를 한 번 실행하면 자동으로 갱신됩니다.';
+      return t().error.credentialsExpired;
   }
 }
 
@@ -76,31 +77,31 @@ export async function loadCredentials(
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code;
     if (code === 'ENOENT') {
-      throw new CredentialError('not_found', `자격증명 파일이 없습니다: ${path}`);
+      throw new CredentialError('not_found', `credentials file not found: ${path}`);
     }
     if (code === 'EACCES' || code === 'EPERM') {
-      throw new CredentialError('permission_denied', `자격증명 파일을 읽을 수 없습니다: ${path}`);
+      throw new CredentialError('permission_denied', `cannot read credentials file: ${path}`);
     }
-    throw new CredentialError('malformed', `자격증명 파일 읽기 실패: ${path}`);
+    throw new CredentialError('malformed', `failed to read credentials file: ${path}`);
   }
 
   let raw: RawCredentials;
   try {
     raw = JSON.parse(text) as RawCredentials;
   } catch {
-    throw new CredentialError('malformed', '자격증명 파일이 올바른 JSON이 아닙니다.');
+    throw new CredentialError('malformed', 'credentials file is not valid JSON.');
   }
 
   const oauth = raw.claudeAiOauth;
   const token = oauth?.accessToken;
   if (typeof token !== 'string' || token.length === 0) {
-    throw new CredentialError('missing_token', 'claudeAiOauth.accessToken 이 없습니다.');
+    throw new CredentialError('missing_token', 'claudeAiOauth.accessToken is missing.');
   }
 
   const expiresAt = typeof oauth?.expiresAt === 'number' ? oauth.expiresAt : 0;
   if (expiresAt > 0 && expiresAt <= now) {
     // 토큰 갱신은 Claude Code가 담당한다. 우리는 만료를 알리고 물러난다.
-    throw new CredentialError('expired', '토큰이 만료되었습니다.');
+    throw new CredentialError('expired', 'token has expired.');
   }
 
   return {

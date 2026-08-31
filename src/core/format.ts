@@ -1,21 +1,23 @@
+import { t } from '../shared/i18n/index.js';
 import type { Severity, UsageSnapshot, WindowSnapshot } from './types.js';
 
 /** 사람이 읽는 문자열로 바꾸는 함수들. CLI와 말풍선(M2)이 함께 쓴다. */
 
-/** "2시간 14분", "3일 5시간" 처럼. 이미 지났으면 '곧'. */
+/** "2시간 14분" / "2h 14m" 처럼. 이미 지났으면 '곧'. */
 export function formatRemaining(resetsAt: number | null, now: number = Date.now()): string {
-  if (resetsAt === null) return '알 수 없음';
+  const f = t().format;
+  if (resetsAt === null) return f.unknown;
   const ms = resetsAt - now;
-  if (ms <= 0) return '곧';
+  if (ms <= 0) return f.soon;
 
   const totalMin = Math.floor(ms / 60_000);
   const days = Math.floor(totalMin / 1440);
   const hours = Math.floor((totalMin % 1440) / 60);
   const mins = totalMin % 60;
 
-  if (days > 0) return hours > 0 ? `${days}일 ${hours}시간` : `${days}일`;
-  if (hours > 0) return mins > 0 ? `${hours}시간 ${mins}분` : `${hours}시간`;
-  return `${mins}분`;
+  if (days > 0) return f.days(days, hours);
+  if (hours > 0) return f.hours(hours, mins);
+  return f.minutes(mins);
 }
 
 /** 소수점 첫째 자리까지, 정수면 정수로. */
@@ -29,46 +31,56 @@ export function gaugeBar(percent: number, width = 20): string {
   return '█'.repeat(filled) + '░'.repeat(width - filled);
 }
 
-const SEVERITY_LABEL: Record<Severity, string> = {
-  normal: '여유',
-  warning: '주의',
-  critical: '위험',
-};
-
 export function severityLabel(severity: Severity): string {
-  return SEVERITY_LABEL[severity];
+  const s: Record<Severity, string> = t().severity;
+  return s[severity];
 }
 
-function windowLine(label: string, win: WindowSnapshot, now: number): string {
-  if (!win.available) return `  ${label.padEnd(6)}  (제공되지 않음)`;
+/**
+ * 창 이름 칸의 너비.
+ *
+ * 언어마다 이름 길이가 달라 고정 폭을 쓰면 영어에서 열이 어긋난다.
+ * 이번에 출력할 이름들 중 가장 긴 것에 맞춘다.
+ */
+function labelWidth(labels: string[]): number {
+  return Math.max(...labels.map((l) => l.length));
+}
+
+function windowLine(label: string, width: number, win: WindowSnapshot, now: number): string {
+  const c = t();
+  if (!win.available) return `  ${label.padEnd(width)}  ${c.cli.notProvided}`;
   return [
-    `  ${label.padEnd(6)}`,
+    `  ${label.padEnd(width)}`,
     gaugeBar(win.percent),
     formatPercent(win.percent).padStart(6),
     `· ${severityLabel(win.severity)}`,
-    `· 리셋까지 ${formatRemaining(win.resetsAt, now)}`,
+    `· ${c.cli.resetsIn} ${formatRemaining(win.resetsAt, now)}`,
   ].join(' ');
 }
 
 /** CLI `--once` 출력. */
 export function formatSnapshot(snapshot: UsageSnapshot, now: number = Date.now()): string {
+  const c = t();
+  const width = labelWidth([c.window.fiveHour, c.window.weekly]);
+
   const lines = [
-    'Claude 사용량',
+    c.cli.heading,
     '',
-    windowLine('5시간', snapshot.fiveHour, now),
-    windowLine('주간', snapshot.weekly, now),
+    windowLine(c.window.fiveHour, width, snapshot.fiveHour, now),
+    windowLine(c.window.weekly, width, snapshot.weekly, now),
   ];
 
   if (snapshot.scoped.length > 0) {
-    lines.push('', '  모델별 주간');
+    lines.push('', `  ${c.cli.scopedHeading}`);
+    const scopedWidth = labelWidth(snapshot.scoped.map((s) => s.label));
     for (const s of snapshot.scoped) {
       lines.push(
-        `    ${s.label.padEnd(10)} ${gaugeBar(s.percent, 12)} ${formatPercent(s.percent).padStart(6)}` +
-          ` · 리셋까지 ${formatRemaining(s.resetsAt, now)}`,
+        `    ${s.label.padEnd(scopedWidth)} ${gaugeBar(s.percent, 12)} ${formatPercent(s.percent).padStart(6)}` +
+          ` · ${c.cli.resetsIn} ${formatRemaining(s.resetsAt, now)}`,
       );
     }
   }
 
-  lines.push('', `  종합: ${severityLabel(snapshot.severity)}`);
+  lines.push('', `  ${c.cli.overall(severityLabel(snapshot.severity))}`);
   return lines.join('\n');
 }

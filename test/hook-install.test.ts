@@ -1,3 +1,4 @@
+import { setLocale } from '../src/shared/i18n/index.js';
 import { mkdtemp, readFile, writeFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -20,6 +21,11 @@ const OTHER_HOOK = {
   matcher: 'Bash',
   hooks: [{ type: 'command', command: 'echo 사용자가 직접 만든 훅' }],
 };
+
+
+// 이 파일은 한국어 문구 자체를 검증한다. 기본 언어(영어)에 기대면
+// 문구를 다듬을 때마다 무관한 테스트가 깨진다.
+beforeEach(() => setLocale('ko'));
 
 describe('withHooks / withoutHooks', () => {
   it('빈 설정에 훅을 넣는다', () => {
@@ -146,7 +152,7 @@ describe('installHooks / uninstallHooks', () => {
   it('손상된 설정 파일은 덮어쓰지 않고 멈춘다', async () => {
     const settings = join(dir, 'settings.json');
     await writeFile(settings, '{ 깨진 JSON');
-    await expect(installHooks(settings, join(dir, 'n.sh'))).rejects.toThrow(/읽을 수 없습니다/);
+    await expect(installHooks(settings, join(dir, 'n.sh'))).rejects.toThrow(/cannot read/);
     expect(await readFile(settings, 'utf8')).toBe('{ 깨진 JSON');
   });
 });

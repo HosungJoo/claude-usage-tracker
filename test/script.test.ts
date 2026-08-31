@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { setLocale } from '../src/shared/i18n/index.js';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
   lineForGreeting,
   lineForManualCheck,
@@ -25,6 +26,11 @@ function snap(five: number, week: number, severity: Severity = 'normal'): UsageS
 function event(threshold: number, severity: Severity = 'normal'): ThresholdEvent {
   return { window: 'fiveHour', threshold, percent: threshold + 1, resetsAt: IN_2H, severity };
 }
+
+
+// 이 파일은 한국어 문구 자체를 검증한다. 기본 언어(영어)에 기대면
+// 문구를 다듬을 때마다 무관한 테스트가 깨진다.
+beforeEach(() => setLocale('ko'));
 
 describe('lineForThreshold', () => {
   // 단계마다 새로운 신호가 하나씩 더해진다 — 표정만 바뀌면 무엇이

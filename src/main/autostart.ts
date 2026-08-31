@@ -1,3 +1,4 @@
+import { t } from '../shared/i18n/index.js';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -37,7 +38,7 @@ export function desktopEntry(target: AutostartTarget): string {
     '[Desktop Entry]',
     'Type=Application',
     'Name=Claude Usage Tracker',
-    'Comment=Claude 사용량을 캐릭터가 알려줍니다',
+    `Comment=${t().appComment}`,
     `Exec=${target.exec}`,
     'Terminal=false',
     'X-GNOME-Autostart-enabled=true',

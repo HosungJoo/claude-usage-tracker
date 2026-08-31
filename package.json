@@ -1,6 +1,6 @@
 {
   "name": "claude-usage-tracker",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "픽셀 클로드 캐릭터가 Claude 사용량을 먼저 알려주는 데스크톱 앱",
   "private": true,
   "type": "module",
@@ -14,7 +14,8 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "dev": "electron-vite dev",
     "demo": "electron-vite dev -- --demo",
-    "shots": "electron-vite dev -- --demo --capture=docs",
+    "shots": "electron-vite dev -- --demo --capture=docs --lang=en",
+    "shots:ko": "electron-vite dev -- --demo --capture=docs/ko --lang=ko",
     "build": "electron-vite build",
     "icons": "tsx tools/make-icons.ts",
     "package": "npm run build && npm run icons && electron-builder --linux AppImage",

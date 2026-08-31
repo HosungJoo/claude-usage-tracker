@@ -1,6 +1,7 @@
 import type { Expression } from './sprites.js';
 import type { Severity, UsageSnapshot } from '../../core/types.js';
 import { formatPercent, formatRemaining } from '../../core/format.js';
+import { t } from '../i18n/index.js';
 import type { ThresholdEvent, WindowKey } from '../../core/thresholds.js';
 
 /**
@@ -20,10 +21,10 @@ export interface Line {
   holdMs: number;
 }
 
-const WINDOW_LABEL: Record<WindowKey, string> = {
-  fiveHour: '5시간',
-  weekly: '주간',
-};
+function windowLabel(key: WindowKey): string {
+  const w = t().window;
+  return key === 'fiveHour' ? w.fiveHour : w.weekly;
+}
 
 /**
  * 임계값별 표정.
@@ -45,38 +46,40 @@ function expressionForThreshold(threshold: number, severity: Severity): Expressi
 
 /** 임계값을 넘었을 때의 대사. */
 export function lineForThreshold(event: ThresholdEvent, now: number = Date.now()): Line {
-  const where = WINDOW_LABEL[event.window];
+  const l = t().line;
+  const where = windowLabel(event.window);
   const left = formatRemaining(event.resetsAt, now);
+  const percent = formatPercent(event.percent);
   const expression = expressionForThreshold(event.threshold, event.severity);
 
   if (event.threshold >= 100) {
     return {
       expression,
-      title: `${where} 사용량을 다 썼어!`,
-      detail: `${left} 뒤에 초기화돼`,
+      title: l.exhausted(where),
+      detail: l.exhaustedDetail(left),
       holdMs: 9000,
     };
   }
   if (event.threshold >= 90) {
     return {
       expression,
-      title: `${where} ${formatPercent(event.percent)}… 거의 다 왔어`,
-      detail: `${left} 뒤 초기화 · 조금만 아껴줘`,
+      title: l.almost(where, percent),
+      detail: l.almostDetail(left),
       holdMs: 8000,
     };
   }
   if (event.threshold >= 70) {
     return {
       expression,
-      title: `${where} 사용량 ${formatPercent(event.percent)}`,
-      detail: `${left} 뒤에 초기화돼`,
+      title: l.high(where, percent),
+      detail: l.highDetail(left),
       holdMs: 7000,
     };
   }
   return {
     expression,
-    title: `${where} 사용량 절반 넘었어`,
-    detail: `${formatPercent(event.percent)} · ${left} 뒤 초기화`,
+    title: l.half(where),
+    detail: l.halfDetail(percent, left),
     holdMs: 6000,
   };
 }
@@ -91,12 +94,15 @@ export function lineForGreeting(snapshot: UsageSnapshot, now: number = Date.now(
   const expression: Expression =
     snapshot.severity === 'critical' ? 'panic' : snapshot.severity === 'warning' ? 'worry' : 'wave';
 
+  const l = t().line;
   const title =
-    snapshot.severity === 'critical'
-      ? '오늘은 좀 아껴 쓰자'
-      : `${formatPercent(remainFive)} 남았어. 시작하자!`;
+    snapshot.severity === 'critical' ? l.greetTight : l.greetSpare(formatPercent(remainFive));
 
-  const detail = `5시간 ${formatPercent(five.percent)} · 주간 ${formatPercent(week.percent)} · ${formatRemaining(five.resetsAt, now)} 뒤 초기화`;
+  const detail = l.greetDetail(
+    formatPercent(five.percent),
+    formatPercent(week.percent),
+    formatRemaining(five.resetsAt, now),
+  );
 
   return { expression, title, detail, holdMs: 7000 };
 }
@@ -106,10 +112,14 @@ export function lineForManualCheck(snapshot: UsageSnapshot, now: number = Date.n
   const expression: Expression =
     snapshot.severity === 'critical' ? 'panic' : snapshot.severity === 'warning' ? 'worry' : 'happy';
 
+  const l = t().line;
   return {
     expression,
-    title: `5시간 ${formatPercent(snapshot.fiveHour.percent)} · 주간 ${formatPercent(snapshot.weekly.percent)}`,
-    detail: `${formatRemaining(snapshot.fiveHour.resetsAt, now)} 뒤 5시간 한도 초기화`,
+    title: l.checkTitle(
+      formatPercent(snapshot.fiveHour.percent),
+      formatPercent(snapshot.weekly.percent),
+    ),
+    detail: l.checkDetail(formatRemaining(snapshot.fiveHour.resetsAt, now)),
     holdMs: 6000,
   };
 }
@@ -131,10 +141,14 @@ export function lineForSessionEnd(
 
   const expression: Expression = snapshot.severity === 'critical' ? 'worry' : 'happy';
 
+  const l = t().line;
   return {
     expression,
-    title: `이번 세션에 ${formatPercent(delta)} 썼어`,
-    detail: `5시간 ${formatPercent(snapshot.fiveHour.percent)} · ${formatRemaining(snapshot.fiveHour.resetsAt, now)} 뒤 초기화`,
+    title: l.sessionEnd(formatPercent(delta)),
+    detail: l.sessionEndDetail(
+      formatPercent(snapshot.fiveHour.percent),
+      formatRemaining(snapshot.fiveHour.resetsAt, now),
+    ),
     holdMs: 5000,
   };
 }

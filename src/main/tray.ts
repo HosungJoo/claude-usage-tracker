@@ -1,3 +1,4 @@
+import { t } from '../shared/i18n/index.js';
 import { Menu, Tray, nativeImage, type BrowserWindow } from 'electron';
 import { trayIconFor, trayTooltip } from './tray-icon.js';
 import { formatPercent, formatRemaining } from '../core/format.js';
@@ -57,17 +58,24 @@ export class UsageTray {
 
   private summaryItems(): Electron.MenuItemConstructorOptions[] {
     if (!this.snapshot) {
-      return [{ label: '사용량을 아직 읽지 못했습니다', enabled: false }];
+      return [{ label: t().tray.notReadYet, enabled: false }];
     }
     const s = this.snapshot;
     const now = Date.now();
+    const tray = t().tray;
     const items: Electron.MenuItemConstructorOptions[] = [
       {
-        label: `5시간  ${formatPercent(s.fiveHour.percent)}  ·  ${formatRemaining(s.fiveHour.resetsAt, now)} 뒤 초기화`,
+        label: tray.fiveHourItem(
+          formatPercent(s.fiveHour.percent),
+          formatRemaining(s.fiveHour.resetsAt, now),
+        ),
         enabled: false,
       },
       {
-        label: `주간    ${formatPercent(s.weekly.percent)}  ·  ${formatRemaining(s.weekly.resetsAt, now)} 뒤 초기화`,
+        label: tray.weeklyItem(
+          formatPercent(s.weekly.percent),
+          formatRemaining(s.weekly.resetsAt, now),
+        ),
         enabled: false,
       },
     ];
@@ -80,15 +88,16 @@ export class UsageTray {
   private rebuildMenu(): void {
     if (!this.tray) return;
 
+    const menu = t().tray;
     const items: Electron.MenuItemConstructorOptions[] = [
       ...this.summaryItems(),
       ...(this.lastError ? [{ label: `⚠ ${this.lastError}`, enabled: false }] : []),
       { type: 'separator' },
-      { label: '지금 확인', click: () => this.actions.checkNow() },
-      { label: '설정…', click: () => this.actions.openSettings() },
-      { label: '로그 열기', click: () => this.actions.openLogs() },
+      { label: menu.checkNow, click: () => this.actions.checkNow() },
+      { label: menu.settings, click: () => this.actions.openSettings() },
+      { label: menu.openLogs, click: () => this.actions.openLogs() },
       { type: 'separator' },
-      { label: '종료', click: () => this.actions.quit() },
+      { label: menu.quit, click: () => this.actions.quit() },
     ];
 
     this.tray.setContextMenu(Menu.buildFromTemplate(items));

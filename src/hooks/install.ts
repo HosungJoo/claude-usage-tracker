@@ -101,7 +101,7 @@ async function readSettings(path: string): Promise<ClaudeSettings> {
     const code = (e as NodeJS.ErrnoException).code;
     if (code === 'ENOENT') return {};
     // 손상된 설정 파일을 덮어쓰면 사용자의 다른 설정이 날아간다. 멈춘다.
-    throw new Error(`Claude Code 설정 파일을 읽을 수 없습니다: ${path}`);
+    throw new Error(`cannot read the Claude Code settings file: ${path}`);
   }
 }
 

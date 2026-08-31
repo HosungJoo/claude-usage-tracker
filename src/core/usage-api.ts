@@ -1,3 +1,4 @@
+import { t } from '../shared/i18n/index.js';
 import { loadCredentials, type Credentials } from './credentials.js';
 import type {
   ScopedSnapshot,
@@ -45,15 +46,15 @@ export function isRetryable(err: UsageError): boolean {
 export function describeUsageError(err: UsageError): string {
   switch (err.code) {
     case 'unauthorized':
-      return '인증이 거부되었습니다. `claude` 를 한 번 실행해 토큰을 갱신해 주세요.';
+      return t().error.authRejected;
     case 'rate_limited':
-      return '요청이 너무 잦습니다. 잠시 후 다시 시도합니다.';
+      return t().error.rateLimited;
     case 'server':
-      return 'Anthropic 서버가 응답하지 않습니다. 잠시 후 다시 시도합니다.';
+      return t().error.serverDown;
     case 'network':
-      return '네트워크에 연결할 수 없습니다.';
+      return t().error.offline;
     case 'malformed':
-      return '사용량 응답을 해석할 수 없습니다.';
+      return t().error.badResponse;
   }
 }
 
@@ -89,34 +90,34 @@ export async function fetchUsage(options: FetchUsageOptions = {}): Promise<Usage
   } catch (e) {
     const aborted = e instanceof Error && e.name === 'AbortError';
     // 에러 원문에 헤더가 섞여 나올 여지를 주지 않기 위해 메시지를 직접 만든다.
-    throw new UsageError('network', aborted ? `요청 시간 초과 (${timeoutMs}ms)` : '연결 실패');
+    throw new UsageError('network', aborted ? `request timed out (${timeoutMs}ms)` : 'connection failed');
   } finally {
     clearTimeout(timer);
   }
 
   if (res.status === 401 || res.status === 403) {
-    throw new UsageError('unauthorized', `인증 거부 (HTTP ${res.status})`);
+    throw new UsageError('unauthorized', `unauthorized (HTTP ${res.status})`);
   }
   if (res.status === 429) {
     const raw = res.headers.get('retry-after');
     const parsed = raw === null ? Number.NaN : Number.parseInt(raw, 10);
     throw new UsageError(
       'rate_limited',
-      '요청 한도 초과 (HTTP 429)',
+      'rate limited (HTTP 429)',
       Number.isFinite(parsed) ? parsed : undefined,
     );
   }
   if (res.status >= 500) {
-    throw new UsageError('server', `서버 오류 (HTTP ${res.status})`);
+    throw new UsageError('server', `server error (HTTP ${res.status})`);
   }
   if (!res.ok) {
-    throw new UsageError('malformed', `예상치 못한 응답 (HTTP ${res.status})`);
+    throw new UsageError('malformed', `unexpected response (HTTP ${res.status})`);
   }
 
   try {
     return (await res.json()) as UsageResponse;
   } catch {
-    throw new UsageError('malformed', '응답 JSON 파싱 실패');
+    throw new UsageError('malformed', 'response JSON parse failed');
   }
 }
 
@@ -170,7 +171,7 @@ function toScoped(limits: UsageLimit[]): ScopedSnapshot[] {
     .map((l) => {
       const model = l.scope?.model?.display_name;
       const surface = l.scope?.surface;
-      const label = model ?? surface ?? '기타';
+      const label = model ?? surface ?? t().cli.otherModel;
       return {
         label,
         percent: clampPercent(l.percent),

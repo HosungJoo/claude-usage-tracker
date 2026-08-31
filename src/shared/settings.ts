@@ -1,6 +1,8 @@
 import { DEFAULT_THRESHOLDS } from '../core/thresholds.js';
 import type { Corner } from '../main/overlay-window.js';
 
+import type { LanguagePreference } from './i18n/index.js';
+
 /**
  * 사용자 설정.
  *
@@ -19,12 +21,6 @@ import type { Corner } from '../main/overlay-window.js';
 export type Anchor = 'center' | 'screen' | 'window';
 
 export const ANCHORS: Anchor[] = ['center', 'screen', 'window'];
-
-export const ANCHOR_LABEL: Record<Anchor, string> = {
-  center: '화면 한가운데 (크게)',
-  screen: '화면 모서리',
-  window: '작업 중인 창',
-};
 
 /**
  * 어느 모니터에 띄울지.
@@ -76,6 +72,13 @@ export interface Settings {
   greetOnSessionStart: boolean;
   /** 로그인 시 자동 실행. */
   autostart: boolean;
+  /**
+   * 화면에 나갈 언어. 'auto'는 시스템 언어를 따른다.
+   *
+   * 기본이 'auto'인 이유: 받는 사람 대부분이 한국어 사용자가 아니지만,
+   * 한국어 데스크톱을 쓰는 사람에게 영어로 말할 이유도 없다.
+   */
+  language: LanguagePreference;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -93,16 +96,10 @@ export const DEFAULT_SETTINGS: Settings = {
   characterEnabled: true,
   greetOnSessionStart: true,
   autostart: false,
+  language: 'auto',
 };
 
 export const CORNERS: Corner[] = ['bottom-right', 'bottom-left', 'top-right', 'top-left'];
-
-export const CORNER_LABEL: Record<Corner, string> = {
-  'bottom-right': '오른쪽 아래',
-  'bottom-left': '왼쪽 아래',
-  'top-right': '오른쪽 위',
-  'top-left': '왼쪽 위',
-};
 
 /** 폴링을 이보다 자주 하면 서버에 실례고, 이보다 드물면 알림이 늦다. */
 export const MIN_POLL_SEC = 15;
@@ -148,6 +145,12 @@ function isCorner(value: unknown): value is Corner {
   return typeof value === 'string' && (CORNERS as string[]).includes(value);
 }
 
+export const LANGUAGES: LanguagePreference[] = ['auto', 'en', 'ko'];
+
+function isLanguage(value: unknown): value is LanguagePreference {
+  return typeof value === 'string' && (LANGUAGES as string[]).includes(value);
+}
+
 function isAnchor(value: unknown): value is Anchor {
   return typeof value === 'string' && (ANCHORS as string[]).includes(value);
 }
@@ -178,5 +181,6 @@ export function normalizeSettings(raw: unknown): Settings {
     characterEnabled: bool(o['characterEnabled'], DEFAULT_SETTINGS.characterEnabled),
     greetOnSessionStart: bool(o['greetOnSessionStart'], DEFAULT_SETTINGS.greetOnSessionStart),
     autostart: bool(o['autostart'], DEFAULT_SETTINGS.autostart),
+    language: isLanguage(o['language']) ? o['language'] : DEFAULT_SETTINGS.language,
   };
 }

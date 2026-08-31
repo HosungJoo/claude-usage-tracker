@@ -1,3 +1,4 @@
+import { t } from '../shared/i18n/index.js';
 import { PixelGrid } from '../shared/pixel/grid.js';
 import { encodePNG } from '../shared/pixel/png.js';
 import { buildFrame, SPRITE_H, SPRITE_W, type Expression } from '../shared/character/sprites.js';
@@ -87,8 +88,8 @@ export function trayIconFor(snapshot: UsageSnapshot | null, size = TRAY_SIZE): U
 
 /** 트레이 툴팁 문구. 마우스를 올렸을 때만 보이는 보조 정보다. */
 export function trayTooltip(snapshot: UsageSnapshot | null): string {
-  if (!snapshot) return 'Claude Usage Tracker — 사용량을 아직 읽지 못했습니다';
+  if (!snapshot) return t().tray.tooltipIdle;
   const f = Math.round(snapshot.fiveHour.percent);
   const w = Math.round(snapshot.weekly.percent);
-  return `Claude 사용량 — 5시간 ${f}% · 주간 ${w}%`;
+  return t().tray.tooltip(`${f}%`, `${w}%`);
 }

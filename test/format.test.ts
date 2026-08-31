@@ -1,7 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { setLocale } from '../src/shared/i18n/index.js';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { formatPercent, formatRemaining, gaugeBar, severityLabel } from '../src/core/format.js';
 
 const NOW = 1_700_000_000_000;
+
+
+// 이 파일은 한국어 문구 자체를 검증한다. 기본 언어(영어)에 기대면
+// 문구를 다듬을 때마다 무관한 테스트가 깨진다.
+beforeEach(() => setLocale('ko'));
 
 describe('formatRemaining', () => {
   it.each([

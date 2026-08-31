@@ -1,4 +1,5 @@
 import { BrowserWindow, ipcMain, screen, shell } from 'electron';
+import { t } from '../shared/i18n/index.js';
 import { join } from 'node:path';
 import { SETTINGS_IPC, type AppStatus, type DisplayInfo } from '../shared/settings-ipc.js';
 import { hooksInstalled, installHooks, uninstallHooks } from '../hooks/install.js';
@@ -38,7 +39,7 @@ function createWindow(deps: SettingsWindowDeps): BrowserWindow {
     height: 760,
     minWidth: 460,
     minHeight: 480,
-    title: 'Claude Usage Tracker 설정',
+    title: t().settings.windowTitle,
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
@@ -69,13 +70,13 @@ function wire(deps: SettingsWindowDeps): void {
 
   ipcMain.handle(SETTINGS_IPC.write, async (_e, patch: Partial<Settings>): Promise<Settings> => {
     const ok = await deps.store.update(patch);
-    if (!ok) deps.logger.warn('설정을 저장하지 못했습니다. 메모리 값만 갱신됩니다.');
+    if (!ok) deps.logger.warn(t().log.settingsSaveFailed);
     return deps.store.value;
   });
 
   ipcMain.handle(SETTINGS_IPC.reset, async (): Promise<Settings> => {
     await deps.store.reset();
-    deps.logger.info('설정을 기본값으로 되돌렸습니다.');
+    deps.logger.info(t().log.settingsReset);
     return deps.store.value;
   });
 
@@ -91,10 +92,10 @@ function wire(deps: SettingsWindowDeps): void {
   ipcMain.handle(SETTINGS_IPC.installHooks, async (): Promise<boolean> => {
     try {
       const r = await installHooks();
-      deps.logger.info(`훅을 설치했습니다: ${r.scriptPath}`);
+      deps.logger.info(t().log.hookInstalled(r.scriptPath));
       return true;
     } catch (e) {
-      deps.logger.error(`훅 설치 실패: ${e instanceof Error ? e.message : String(e)}`);
+      deps.logger.error(t().log.hookInstallFailed(e instanceof Error ? e.message : String(e)));
       return false;
     }
   });
@@ -102,10 +103,10 @@ function wire(deps: SettingsWindowDeps): void {
   ipcMain.handle(SETTINGS_IPC.uninstallHooks, async (): Promise<boolean> => {
     try {
       await uninstallHooks();
-      deps.logger.info('훅을 제거했습니다.');
+      deps.logger.info(t().log.hookRemoved);
       return true;
     } catch (e) {
-      deps.logger.error(`훅 제거 실패: ${e instanceof Error ? e.message : String(e)}`);
+      deps.logger.error(t().log.hookRemoveFailed(e instanceof Error ? e.message : String(e)));
       return false;
     }
   });
@@ -140,7 +141,10 @@ function listDisplays(): DisplayInfo[] {
   const cursorId = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).id;
 
   return screen.getAllDisplays().map((d) => {
-    const orientation = d.bounds.height > d.bounds.width ? '세로' : '가로';
+    const orientation =
+      d.bounds.height > d.bounds.width
+        ? t().settings.orientationPortrait
+        : t().settings.orientationLandscape;
     return {
       id: d.id,
       label: `${orientation} ${d.bounds.width}×${d.bounds.height}`,

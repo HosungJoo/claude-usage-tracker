@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { setLocale } from '../src/shared/i18n/index.js';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { renderTrayIcon, trayTooltip } from '../src/main/tray-icon.js';
 import type { Severity, UsageSnapshot } from '../src/core/types.js';
 
@@ -13,6 +14,11 @@ function snap(five: number, week: number, severity: Severity = 'normal'): UsageS
 }
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+
+// 이 파일은 한국어 문구 자체를 검증한다. 기본 언어(영어)에 기대면
+// 문구를 다듬을 때마다 무관한 테스트가 깨진다.
+beforeEach(() => setLocale('ko'));
 
 describe('renderTrayIcon', () => {
   it('올바른 PNG를 만든다', () => {

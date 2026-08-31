@@ -12,6 +12,7 @@ import {
   UsageError,
   type FetchUsageOptions,
 } from './usage-api.js';
+import { t } from '../shared/i18n/index.js';
 import type { UsageSnapshot } from './types.js';
 
 /**
@@ -193,6 +194,6 @@ export class UsagePoller {
     if (e instanceof CredentialError) {
       return { message: describeCredentialError(e), willRetry: false };
     }
-    return { message: '알 수 없는 오류가 발생했습니다.', willRetry: true };
+    return { message: t().error.unknown, willRetry: true };
   }
 }

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { applyLocale, localeFromEnv, t } from '../shared/i18n/index.js';
 import { CredentialError, describeCredentialError } from '../core/credentials.js';
 import { formatSnapshot } from '../core/format.js';
 import { UsagePoller } from '../core/poller.js';
@@ -73,13 +74,13 @@ function parseArgs(argv: string[]): Args {
         const raw = argv[++i];
         const sec = Number.parseInt(raw ?? '', 10);
         if (!Number.isFinite(sec) || sec <= 0) {
-          throw new Error('--interval 에는 양의 정수(초)를 주세요.');
+          throw new Error(t().cli.badInterval);
         }
         args.intervalMs = sec * 1000;
         break;
       }
       default:
-        throw new Error(`알 수 없는 옵션: ${a}`);
+        throw new Error(t().cli.unknownOption(String(a)));
     }
   }
   return args;
@@ -116,22 +117,22 @@ async function runWatch(intervalMs: number, json: boolean): Promise<number> {
   });
 
   poller.on('threshold', (ev: ThresholdEvent) => {
-    const where = ev.window === 'weekly' ? '주간' : '5시간';
+    const where = ev.window === 'weekly' ? t().window.weekly : t().window.fiveHour;
     // M2에서는 이 자리에 픽셀 캐릭터가 등장한다.
-    console.log(`\n  🔔 ${where} 사용량 ${ev.threshold}% 돌파 (현재 ${ev.percent}%)`);
+    console.log(`\n${t().cli.crossed(where, ev.threshold, `${ev.percent}%`)}`);
   });
 
   poller.on('error', (_e, message, willRetry) => {
-    console.error(`  ⚠ ${message}${willRetry ? ' (재시도합니다)' : ''}`);
+    console.error(`  ⚠ ${message}${willRetry ? t().log.willRetry : ''}`);
   });
 
   await poller.start();
-  console.log(`폴링 시작 — ${intervalMs / 1000}초 주기. Ctrl+C 로 종료합니다.`);
+  console.log(t().cli.watching(intervalMs / 1000));
 
   return new Promise<number>((resolve) => {
     const shutdown = (): void => {
       poller.stop();
-      console.log('\n종료합니다.');
+      console.log(`\n${t().cli.stopping}`);
       resolve(0);
     };
     process.on('SIGINT', shutdown);
@@ -146,24 +147,24 @@ async function runReset(): Promise<number> {
     { fiveHour: { fired: [], resetsAt: null }, weekly: { fired: [], resetsAt: null } },
     null,
   );
-  console.log(ok ? `발화 이력을 지웠습니다: ${defaultStatePath()}` : '상태 파일 저장에 실패했습니다.');
+  console.log(ok ? t().cli.historyCleared(defaultStatePath()) : t().cli.historyClearFailed);
   return ok ? 0 : 1;
 }
 
 async function runInstallHooks(): Promise<number> {
   const result = await installHooks();
-  console.log(result.changed ? '훅을 등록했습니다.' : '훅이 이미 등록되어 있습니다.');
-  console.log(`  설정   ${result.settingsPath}`);
-  console.log(`  스크립트 ${result.scriptPath}`);
-  console.log('\n새로 여는 Claude Code 세션부터 캐릭터가 인사합니다.');
-  console.log('앱이 실행 중이 아니면 훅은 아무 일도 하지 않습니다.');
+  console.log(result.changed ? t().cli.hooksRegistered : t().cli.hooksAlreadyRegistered);
+  console.log(t().cli.settingsPath(result.settingsPath));
+  console.log(t().cli.scriptPath(result.scriptPath));
+  console.log(`\n${t().cli.hooksNextSession}`);
+  console.log(t().cli.hooksNeedApp);
   return 0;
 }
 
 async function runUninstallHooks(): Promise<number> {
   const result = await uninstallHooks();
-  console.log(result.changed ? '훅을 제거했습니다.' : '등록된 훅이 없습니다.');
-  console.log(`  설정 ${result.settingsPath}`);
+  console.log(result.changed ? t().cli.hooksRemoved : t().cli.hooksNotRegistered);
+  console.log(t().cli.settingsPath(result.settingsPath));
   return 0;
 }
 
@@ -173,15 +174,19 @@ async function runHookStatus(): Promise<number> {
   const { existsSync } = await import('node:fs');
   const running = existsSync(spool);
 
-  console.log(`훅 등록   ${installed ? '예' : '아니오'}  (${claudeSettingsPath()})`);
-  console.log(`앱 실행   ${running ? '예' : '아니오'}  (${spool})`);
+  console.log(t().cli.hookStatus(installed ? t().cli.yes : t().cli.no, claudeSettingsPath()));
+  console.log(t().cli.appStatus(running ? t().cli.yes : t().cli.no, spool));
   if (installed && !running) {
-    console.log('\n훅은 등록되어 있지만 앱이 실행 중이 아닙니다. 훅은 조용히 무시됩니다.');
+    console.log(`\n${t().cli.hooksButNoApp}`);
   }
   return installed ? 0 : 1;
 }
 
 async function main(): Promise<number> {
+  // 셸의 언어를 따른다. CLI에는 설정 파일을 읽을 이유가 없다 —
+  // 터미널에서 한 번 보고 마는 출력이다.
+  applyLocale('auto', localeFromEnv(process.env));
+
   let args: Args;
   try {
     args = parseArgs(process.argv.slice(2));
@@ -204,7 +209,7 @@ async function main(): Promise<number> {
     if (args.mode === 'watch') return await runWatch(args.intervalMs, args.json);
     return await runOnce(args.json);
   } catch (e) {
-    console.error(`오류: ${explain(e)}`);
+    console.error(t().cli.errorPrefix(explain(e)));
     return 1;
   }
 }

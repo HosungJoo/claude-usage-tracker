@@ -1,0 +1,220 @@
+import type { Catalog } from './catalog.js';
+
+/**
+ * English strings.
+ *
+ * The character speaks the way a colleague leaning over would — short,
+ * present tense, no exclamation stacking. It is telling you something you
+ * did not ask for, so it has to be worth the interruption and then get out.
+ */
+export const en: Catalog = {
+  window: {
+    fiveHour: '5-hour',
+    weekly: 'Weekly',
+  },
+
+  format: {
+    unknown: 'unknown',
+    soon: 'any moment',
+    days: (d, h) => (h > 0 ? `${d}d ${h}h` : `${d}d`),
+    hours: (h, m) => (m > 0 ? `${h}h ${m}m` : `${h}h`),
+    minutes: (m) => `${m}m`,
+    seconds: (s) => `${s}s`,
+    minutesSeconds: (m, s) => (s === 0 ? `${m}m` : `${m}m ${s}s`),
+  },
+
+  severity: {
+    normal: 'fine',
+    warning: 'watch',
+    critical: 'critical',
+  },
+
+  line: {
+    exhausted: (where) => `Your ${where} limit is gone!`,
+    exhaustedDetail: (left) => `Resets in ${left}`,
+    almost: (where, percent) => `${where} at ${percent} — nearly there`,
+    almostDetail: (left) => `Resets in ${left} · go easy`,
+    high: (where, percent) => `${where} usage at ${percent}`,
+    highDetail: (left) => `Resets in ${left}`,
+    half: (where) => `${where} usage is past halfway`,
+    halfDetail: (percent, left) => `${percent} · resets in ${left}`,
+    greetSpare: (remaining) => `${remaining} left. Let's go!`,
+    greetTight: "Let's pace ourselves today",
+    greetDetail: (five, week, left) => `5-hour ${five} · weekly ${week} · resets in ${left}`,
+    checkTitle: (five, week) => `5-hour ${five} · weekly ${week}`,
+    checkDetail: (left) => `5-hour limit resets in ${left}`,
+    sessionEnd: (used) => `That session used ${used}`,
+    sessionEndDetail: (five, left) => `5-hour ${five} · resets in ${left}`,
+  },
+
+  appComment: 'A character tells you your Claude usage',
+
+  tray: {
+    notReadYet: 'Usage not read yet',
+    fiveHourItem: (percent, left) => `5-hour  ${percent}  ·  resets in ${left}`,
+    weeklyItem: (percent, left) => `Weekly  ${percent}  ·  resets in ${left}`,
+    checkNow: 'Check now',
+    settings: 'Settings…',
+    openLogs: 'Open logs',
+    quit: 'Quit',
+    tooltipIdle: 'Claude Usage Tracker — usage not read yet',
+    tooltip: (five, week) => `Claude usage — 5-hour ${five} · weekly ${week}`,
+  },
+
+  error: {
+    authRejected: 'Authentication was rejected. Run `claude` once to refresh your token.',
+    rateLimited: 'Too many requests. Retrying shortly.',
+    serverDown: 'The Anthropic server is not responding. Retrying shortly.',
+    offline: 'Cannot reach the network.',
+    badResponse: 'Could not read the usage response.',
+    unknown: 'Something went wrong.',
+    credentialsMissing:
+      'No Claude Code credentials found. Run `claude` in a terminal and sign in once.',
+    credentialsUnreadable:
+      'No permission to read the credentials file. Check its owner and mode (600).',
+    credentialsCorrupt: 'The credentials file is corrupt. Signing in again with `claude` fixes it.',
+    credentialsNoToken:
+      'No OAuth token in the credentials. If you signed in with an API key, this app cannot read your usage.',
+    credentialsExpired: 'Your token expired. Running `claude` once refreshes it automatically.',
+  },
+
+  anchorLabel: {
+    center: 'Screen center (large)',
+    screen: 'Screen corner',
+    window: 'Active window',
+  },
+
+  cornerLabel: {
+    'bottom-right': 'Bottom right',
+    'bottom-left': 'Bottom left',
+    'top-right': 'Top right',
+    'top-left': 'Top left',
+  },
+
+  settings: {
+    windowTitle: 'Claude Usage Tracker Settings',
+    heading: 'Settings',
+    on: 'On',
+    sectionAlerts: 'Alerts',
+    thresholds: 'Alert at',
+    thresholdsHint: 'Comma-separated percentages. Alerts once each time you cross one.',
+    thresholdsError: 'Only values between 1 and 100.',
+    holdTime: 'Hold time when you are looking',
+    holdHint: 'Applies only while you are at the keyboard.',
+    waitWhenAway: 'Wait if you are away',
+    waitAwayHint:
+      'With no keyboard or mouse input, it stays up until you come back. An alert you did not see is an alert that did not happen.',
+    pollInterval: 'Check every',
+    pollHint: 'Checking more often means faster alerts and more requests.',
+    sectionCharacter: 'Character',
+    showOnScreen: 'Show on screen',
+    showHint: 'When off, only the tray icon reports your usage.',
+    whichMonitor: 'Which monitor',
+    anchor: 'Anchor',
+    corner: 'Corner',
+    margin: 'Edge margin',
+    preview: 'Preview',
+    previewButton: 'Show it now',
+    previewHint: 'Shows the character once with your current settings.',
+    sectionSession: 'Session integration',
+    greetOnStart: 'Greet on session start',
+    greetHint: 'Tells you what is left when a Claude Code session opens.',
+    hooks: 'Claude Code hooks',
+    hooksHint:
+      'Hooks are what detect session start and end. Installing them does nothing while this app is not running.',
+    hookInstalled: 'Installed',
+    hookMissing: 'Not installed',
+    hookInstall: 'Install hooks',
+    hookRemove: 'Remove hooks',
+    hookFailed: 'Could not change the hooks. Check the logs.',
+    sectionSystem: 'System',
+    autostart: 'Start on login',
+    sectionDiagnostics: 'Diagnostics',
+    openLogFolder: 'Open log folder',
+    resetDefaults: 'Reset to defaults',
+    saved: 'Saved',
+    language: 'Language',
+    languageAuto: 'System language',
+    displayAll: 'All monitors',
+    displayPrimary: 'Primary monitor',
+    displayCursor: 'Monitor with the cursor',
+    displayHintAll:
+      'There is no way to know which screen you are looking at, so it draws on all of them. With one screen it makes no difference.',
+    displayHintPrimary: 'Always the primary monitor only.',
+    displayHintCursor: 'On Wayland the cursor position is unknowable, so this can pick the wrong screen.',
+    displayHintSpecific: 'Only the monitor you picked.',
+    anchorHintWindow:
+      'Sticks to the corner of the window you are working in (editor, terminal). Falls back to the screen corner when no window is found.',
+    anchorHintScreen: 'Always the same spot on screen, whatever window you are using.',
+    monitorTagPrimary: 'primary',
+    monitorTagCursor: 'has cursor',
+    orientationPortrait: 'portrait',
+    orientationLandscape: 'landscape',
+    planKnown: (plan) => `${plan} plan`,
+    planUnknown: 'Plan unknown',
+  },
+
+  cli: {
+    heading: 'Claude usage',
+    notProvided: '(not provided)',
+    resetsIn: 'resets in',
+    scopedHeading: 'Weekly by model',
+    otherModel: 'other',
+    overall: (label) => `Overall: ${label}`,
+    badInterval: '--interval takes a positive integer (seconds).',
+    unknownOption: (o) => `Unknown option: ${o}`,
+    crossed: (where, threshold, percent) =>
+      `  🔔 ${where} usage crossed ${threshold}% (now ${percent})`,
+    watching: (seconds) => `Polling every ${seconds}s. Ctrl+C to stop.`,
+    stopping: 'Stopping.',
+    historyCleared: (path) => `Alert history cleared: ${path}`,
+    historyClearFailed: 'Could not write the state file.',
+    hooksRegistered: 'Hooks registered.',
+    hooksAlreadyRegistered: 'Hooks were already registered.',
+    hooksRemoved: 'Hooks removed.',
+    hooksNotRegistered: 'No hooks were registered.',
+    settingsPath: (path) => `  settings  ${path}`,
+    scriptPath: (path) => `  script    ${path}`,
+    hooksNextSession: 'The character will greet you from your next Claude Code session.',
+    hooksNeedApp: 'Hooks do nothing while the app is not running.',
+    hookStatus: (yesNo, path) => `Hooks registered  ${yesNo}  (${path})`,
+    appStatus: (yesNo, path) => `App running       ${yesNo}  (${path})`,
+    yes: 'yes',
+    no: 'no',
+    hooksButNoApp: 'Hooks are registered but the app is not running. They will be ignored silently.',
+    errorPrefix: (message) => `Error: ${message}`,
+  },
+
+  log: {
+    started: (thresholds, seconds) =>
+      `Started — thresholds ${thresholds}, every ${seconds}s`,
+    quitting: 'Quitting.',
+    placement: (where, screens, at) => `Placed — ${where} · ${screens} screen(s) → ${at}`,
+    placementCenter: 'screen center',
+    placementWindowCorner: 'window corner',
+    placementScreenCorner: 'screen corner',
+    windowNotFound: 'No working window found; falling back to the screen.',
+    shown: (id, title) => `Shown #${id} — ${title}`,
+    held: (id) => `Held #${id} — nobody at the keyboard, leaving it up`,
+    released: (id, reason) => `Released #${id} — ${reason}`,
+    releaseTimeout: 'time elapsed',
+    releaseReturned: (waitedSec) => `returned, waited ${waitedSec}s`,
+    releaseDismissed: 'dismissed by user',
+    thresholdCrossed: (threshold, where, percent) =>
+      `Crossed ${threshold}% (${where} ${percent})`,
+    pollSettingsChanged: (seconds, thresholds) =>
+      `Polling changed — every ${seconds}s, thresholds ${thresholds}`,
+    settingsSaveFailed: 'Could not save settings. Only the in-memory values changed.',
+    settingsReset: 'Settings reset to defaults.',
+    hookInstalled: (path) => `Hooks installed: ${path}`,
+    hookInstallFailed: (message) => `Hook install failed: ${message}`,
+    hookRemoved: 'Hooks removed.',
+    hookRemoveFailed: (message) => `Hook removal failed: ${message}`,
+    willRetry: ' (will retry)',
+    autostartOn: 'Start on login enabled',
+    autostartOff: 'Start on login disabled',
+    autostartFailed: 'Could not change start-on-login',
+    spoolFailed: (message) => `Could not start receiving events: ${message}`,
+    checkNowFailed: 'Check now: could not read usage.',
+  },
+};

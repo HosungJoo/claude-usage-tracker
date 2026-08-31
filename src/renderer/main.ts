@@ -24,7 +24,7 @@ const gaugesEl = document.getElementById('gauges') as HTMLDivElement;
 const canvas = document.getElementById('character') as HTMLCanvasElement;
 
 const ctx = canvas.getContext('2d');
-if (ctx === null) throw new Error('2D 컨텍스트를 만들 수 없습니다.');
+if (ctx === null) throw new Error('Could not create a 2D context.');
 const paint = ctx;
 paint.imageSmoothingEnabled = false;
 

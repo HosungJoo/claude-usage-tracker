@@ -1,3 +1,4 @@
+import { t } from './i18n/index.js';
 import type { Line } from './character/script.js';
 import type { Corner, OverlaySize } from '../main/overlay-window.js';
 import type { Severity, UsageSnapshot } from '../core/types.js';
@@ -44,10 +45,10 @@ export const IPC = {
 export function gaugesFromSnapshot(snapshot: UsageSnapshot): GaugeInfo[] {
   const out: GaugeInfo[] = [];
   if (snapshot.fiveHour.available) {
-    out.push({ label: '5시간', percent: snapshot.fiveHour.percent, severity: snapshot.fiveHour.severity });
+    out.push({ label: t().window.fiveHour, percent: snapshot.fiveHour.percent, severity: snapshot.fiveHour.severity });
   }
   if (snapshot.weekly.available) {
-    out.push({ label: '주간', percent: snapshot.weekly.percent, severity: snapshot.weekly.severity });
+    out.push({ label: t().window.weekly, percent: snapshot.weekly.percent, severity: snapshot.weekly.severity });
   }
   return out;
 }

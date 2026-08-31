@@ -1,17 +1,17 @@
 # Claude Usage Tracker
 
-[English →](README.md)
+[English →](README.md) · [웹사이트](https://hosungju.github.io/claude-usage-tracker/ko/)
 
 픽셀 클로드 캐릭터가 Claude 사용량을 **먼저** 알려주는 데스크톱 앱.
 
 기존 사용량 도구는 막대 그래프만 보여주거나 마우스를 갖다 대야 확인할 수 있습니다.
 이 앱은 백그라운드에 상주하며, 임계값에 도달하면 캐릭터가 **알아서 나타나** 보고합니다.
 
-![시작할 때 인사](docs/greeting.png)
+![시작할 때 인사](docs/ko/greeting.png)
 
 | 90% | 100% |
 |---|---|
-| ![90%](docs/threshold-90.png) | ![100%](docs/threshold-100.png) |
+| ![90%](docs/ko/threshold-90.png) | ![100%](docs/ko/threshold-100.png) |
 
 ## 현재 상태
 
@@ -66,7 +66,8 @@ npm run cli -- --once      # 현재 사용량 출력
 npm run cli -- --json      # JSON으로
 npm run cli -- --watch     # 폴링하며 임계값 이벤트 관찰
 npm run sprites            # 캐릭터 스프라이트 시트를 PNG로 뽑아 눈으로 확인
-npm run shots              # README에 쓰는 장면 스크린샷을 docs/ 에 다시 뽑는다
+npm run shots              # 영문 스크린샷을 docs/ 에 다시 뽑는다
+npm run shots:ko           # 한국어 스크린샷을 docs/ko/ 에 다시 뽑는다
 npm run check:transparency # 오버레이가 실제로 투명한지 검사
 
 npm run package            # AppImage 빌드 → release/
@@ -105,6 +106,7 @@ npm run cli -- --uninstall-hooks   # 훅 제거
 | 가장자리 여백 | 24px | 0~200px |
 | 시작할 때 인사 | 켜짐 | |
 | 로그인 시 자동 실행 | 꺼짐 | XDG autostart |
+| 언어 | 시스템 | 시스템 / English / 한국어 |
 
 **저장 버튼이 없습니다.** 값을 바꾸면 바로 적용되고 저장됩니다 — 설정이 열 개도
 안 되는 화면에서 저장 버튼은 눌렀는지 아닌지만 헷갈리게 합니다.

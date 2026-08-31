@@ -1,11 +1,11 @@
 import {
   ANCHORS,
-  ANCHOR_LABEL,
   CORNERS,
-  CORNER_LABEL,
+  LANGUAGES,
   normalizeThresholds,
   type Settings,
 } from '../shared/settings.js';
+import { applyLocale, locale, t, type LanguagePreference } from '../shared/i18n/index.js';
 import type { SettingsApi } from '../preload/settings.js';
 
 declare global {
@@ -23,7 +23,7 @@ declare global {
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
-  if (!el) throw new Error(`요소를 찾을 수 없습니다: ${id}`);
+  if (!el) throw new Error(`Element not found: ${id}`);
   return el as T;
 };
 
@@ -53,6 +53,7 @@ const els = {
   reset: $<HTMLButtonElement>('reset'),
   paths: $<HTMLParagraphElement>('paths'),
   saved: $<HTMLParagraphElement>('saved'),
+  language: $<HTMLSelectElement>('language'),
 };
 
 let savedTimer: number | null = null;
@@ -66,33 +67,32 @@ function flashSaved(): void {
 }
 
 function formatSeconds(sec: number): string {
-  if (sec < 60) return `${sec}초`;
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return s === 0 ? `${m}분` : `${m}분 ${s}초`;
+  const f = t().format;
+  if (sec < 60) return f.seconds(sec);
+  return f.minutesSeconds(Math.floor(sec / 60), sec % 60);
 }
 
 function render(settings: Settings): void {
   els.thresholds.value = settings.thresholds.join(', ');
   els.hold.value = String(settings.holdSec);
-  els.holdOut.textContent = `${settings.holdSec}초`;
+  els.holdOut.textContent = t().format.seconds(settings.holdSec);
   els.waitAway.checked = settings.waitWhenAway;
   els.interval.value = String(settings.pollIntervalSec);
   els.intervalOut.textContent = formatSeconds(settings.pollIntervalSec);
   els.character.checked = settings.characterEnabled;
   els.display.value = String(settings.display);
+  const c = t().settings;
   const displayHints: Record<string, string> = {
-    all: '어느 화면을 보고 계신지 알 수 없으므로 전부에 띄웁니다. 화면이 하나면 차이가 없습니다.',
-    primary: '항상 주 모니터에만 뜹니다.',
-    cursor: 'Wayland에서는 마우스 위치를 알 수 없어 엉뚱한 화면에 뜰 수 있습니다.',
+    all: c.displayHintAll,
+    primary: c.displayHintPrimary,
+    cursor: c.displayHintCursor,
   };
   els.displayHint.textContent =
-    displayHints[String(settings.display)] ?? '지정한 모니터에만 뜹니다.';
+    displayHints[String(settings.display)] ?? c.displayHintSpecific;
   els.anchor.value = settings.anchor;
   els.anchorHint.textContent =
-    settings.anchor === 'window'
-      ? '작업 중인 창(편집기·터미널)의 모서리에 붙습니다. 창을 찾지 못하면 화면 모서리로 물러납니다.'
-      : '어느 창을 쓰든 화면의 같은 자리에 뜹니다.';
+    settings.anchor === 'window' ? c.anchorHintWindow : c.anchorHintScreen;
+  els.language.value = settings.language;
   els.corner.value = settings.corner;
   els.margin.value = String(settings.margin);
   els.marginOut.textContent = `${settings.margin}px`;
@@ -111,9 +111,10 @@ async function save(patch: Partial<Settings>): Promise<void> {
 }
 
 function renderHookState(installed: boolean): void {
-  els.hookState.textContent = installed ? '설치됨' : '설치 안 됨';
+  const c = t().settings;
+  els.hookState.textContent = installed ? c.hookInstalled : c.hookMissing;
   els.hookState.className = `pill ${installed ? 'on' : 'off'}`;
-  els.hookToggle.textContent = installed ? '훅 제거' : '훅 설치';
+  els.hookToggle.textContent = installed ? c.hookRemove : c.hookInstall;
   els.hookToggle.classList.toggle('ghost', installed);
 }
 
@@ -121,10 +122,11 @@ function renderHookState(installed: boolean): void {
 function renderDisplays(status: Awaited<ReturnType<typeof window.settings.status>>, selected: string): void {
   els.display.replaceChildren();
 
+  const c = t().settings;
   const fixed: Array<[string, string]> = [
-    ['all', '모든 모니터'],
-    ['primary', '주 모니터'],
-    ['cursor', '커서가 있는 화면'],
+    ['all', c.displayAll],
+    ['primary', c.displayPrimary],
+    ['cursor', c.displayCursor],
   ];
   for (const [value, label] of fixed) {
     const opt = document.createElement('option');
@@ -136,7 +138,10 @@ function renderDisplays(status: Awaited<ReturnType<typeof window.settings.status
   for (const d of status.displays) {
     const opt = document.createElement('option');
     opt.value = String(d.id);
-    const tags = [d.primary ? '주' : '', d.hasCursor ? '커서 있음' : ''].filter(Boolean);
+    const tags = [
+      d.primary ? c.monitorTagPrimary : '',
+      d.hasCursor ? c.monitorTagCursor : '',
+    ].filter(Boolean);
     opt.textContent = `${d.label}${tags.length ? ` · ${tags.join(' · ')}` : ''}`;
     els.display.append(opt);
   }
@@ -149,7 +154,8 @@ async function refreshStatus(): Promise<void> {
   renderDisplays(status, String((await window.settings.read()).display));
   renderHookState(status.hooksInstalled);
 
-  const plan = status.subscription ? `${status.subscription} 플랜` : '플랜 정보 없음';
+  const c = t().settings;
+  const plan = status.subscription ? c.planKnown(status.subscription) : c.planUnknown;
   els.status.textContent = status.lastError ? `${plan} · ⚠ ${status.lastError}` : plan;
   els.paths.textContent = `${status.settingsPath}\n${status.logPath}`;
 }
@@ -167,14 +173,14 @@ els.thresholds.addEventListener('change', () => {
   // 되돌려 놓으면 왜 안 먹었는지 알 길이 없다.
   const dropped = parsed.length > 0 && cleaned.join() !== [...new Set(parsed)].sort((a, b) => a - b).join();
   els.thresholdsError.hidden = !dropped;
-  els.thresholdsError.textContent = dropped ? '1~100 사이의 값만 쓸 수 있습니다.' : '';
+  els.thresholdsError.textContent = dropped ? t().settings.thresholdsError : '';
   els.thresholds.setAttribute('aria-invalid', String(dropped));
 
   void save({ thresholds: cleaned });
 });
 
 els.hold.addEventListener('input', () => {
-  els.holdOut.textContent = `${els.hold.value}초`;
+  els.holdOut.textContent = t().format.seconds(Number(els.hold.value));
 });
 els.hold.addEventListener('change', () => void save({ holdSec: Number(els.hold.value) }));
 els.waitAway.addEventListener('change', () => void save({ waitWhenAway: els.waitAway.checked }));
@@ -226,7 +232,7 @@ els.hookToggle.addEventListener('click', async () => {
       ? await window.settings.uninstallHooks()
       : await window.settings.installHooks();
     if (!ok) {
-      els.status.textContent = '훅을 바꾸지 못했습니다. 로그를 확인해 주세요.';
+      els.status.textContent = t().settings.hookFailed;
     }
     await refreshStatus();
   } finally {
@@ -236,21 +242,66 @@ els.hookToggle.addEventListener('click', async () => {
 
 /* ---------- 초기화 ---------- */
 
-for (const anchor of ANCHORS) {
-  const opt = document.createElement('option');
-  opt.value = anchor;
-  opt.textContent = ANCHOR_LABEL[anchor];
-  els.anchor.append(opt);
+/**
+ * data-i18n 이 붙은 요소를 문구표로 채운다.
+ *
+ * HTML에 문구를 두면 언어를 늘릴 때 마크업을 복제하게 된다. 마크업은
+ * 한 벌만 두고 글자만 갈아 끼운다.
+ */
+function applyStaticText(): void {
+  const c = t().settings as unknown as Record<string, unknown>;
+  for (const el of document.querySelectorAll<HTMLElement>('[data-i18n]')) {
+    const key = el.dataset['i18n'];
+    if (key === undefined) continue;
+    const value = c[key];
+    if (typeof value === 'string') el.textContent = value;
+  }
+  // 자간·줄바꿈 규칙이 언어마다 다르다. 브라우저에 어느 언어인지 알린다.
+  document.documentElement.lang = locale();
 }
 
-for (const corner of CORNERS) {
+function option(value: string, label: string): HTMLOptionElement {
   const opt = document.createElement('option');
-  opt.value = corner;
-  opt.textContent = CORNER_LABEL[corner];
-  els.corner.append(opt);
+  opt.value = value;
+  opt.textContent = label;
+  return opt;
 }
+
+function fillSelects(): void {
+  // 언어 이름은 번역하지 않는다 — 알아볼 수 없는 언어로 적힌 언어 이름은
+  // 고를 수가 없다.
+  const languageLabel: Record<LanguagePreference, string> = {
+    auto: t().settings.languageAuto,
+    en: 'English',
+    ko: '한국어',
+  };
+  els.language.replaceChildren(...LANGUAGES.map((l) => option(l, languageLabel[l])));
+  els.anchor.replaceChildren(...ANCHORS.map((a) => option(a, t().anchorLabel[a])));
+  els.corner.replaceChildren(...CORNERS.map((c) => option(c, t().cornerLabel[c])));
+}
+
+/** 화면 전체를 지금 언어로 다시 그린다. */
+async function paint(settings: Settings): Promise<void> {
+  applyStaticText();
+  fillSelects();
+  render(settings);
+  await refreshStatus();
+}
+
+els.language.addEventListener('change', () => {
+  void (async () => {
+    const next = await window.settings.write({
+      language: els.language.value as LanguagePreference,
+    });
+    applyLocale(next.language, navigator.language);
+    await paint(next);
+    flashSaved();
+  })();
+});
 
 void (async () => {
-  render(await window.settings.read());
-  await refreshStatus();
+  const settings = await window.settings.read();
+  // 무엇을 그리기 전에 언어부터 정한다. 한 번 그린 뒤 갈아 끼우면 깜박인다.
+  applyLocale(settings.language, navigator.language);
+  await paint(settings);
 })();
