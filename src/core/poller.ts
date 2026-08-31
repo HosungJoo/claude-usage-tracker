@@ -26,6 +26,20 @@ export const DEFAULT_INTERVAL_MS = 60_000;
 const MIN_INTERVAL_MS = 10_000;
 const MAX_BACKOFF_MS = 300_000; // 5분
 const BASE_BACKOFF_MS = 5_000;
+/**
+ * 429에는 이보다 빨리 다시 두드리지 않는다.
+ *
+ * 이 엔드포인트의 429에는 Retry-After가 없다. 그러면 일반 백오프(5초)로
+ * 떨어지는데, 429는 '너무 자주 불렀다'는 뜻이라 5초 뒤 재시도는 원인을
+ * 그대로 반복하는 짓이다. 실제로 한 번 막히면 성공할 때까지 몇 초 간격으로
+ * 두드리다가, 성공해 카운터가 풀리면 1분 뒤 같은 폭주를 다시 시작했다.
+ * 저쪽이 알려주지 않을 때는 폴링 주기만큼은 쉰다.
+ */
+const RATE_LIMIT_MIN_BACKOFF_MS = 60_000;
+/** 429를 만난 뒤 이 시간 동안은 조심스럽게 돈다. */
+const RATE_LIMIT_CALM_MS = 10 * 60_000;
+/** 그동안 쓰는 폴링 주기. 숫자는 조금 늦어도 되지만 막히면 아무것도 못 본다. */
+const RATE_LIMIT_INTERVAL_MS = 180_000;
 
 export interface PollerOptions extends FetchUsageOptions {
   intervalMs?: number;
@@ -61,6 +75,8 @@ export class UsagePoller {
   /** 진행 중인 조회. 겹쳐 부르면 이것을 같이 기다린다. */
   private inFlight: Promise<UsageSnapshot | null> | null = null;
   private consecutiveFailures = 0;
+  /** 마지막으로 429를 받은 시각. 0이면 아직 없다. */
+  private lastRateLimitedAt = 0;
   private thresholdState: ThresholdState | null = null;
   private lastSnapshot: UsageSnapshot | null = null;
 
@@ -156,14 +172,30 @@ export class UsagePoller {
   }
 
   /** 실패 횟수에 따른 지수 백오프. 5분에서 멈춘다. */
-  private backoffMs(retryAfterSec?: number): number {
+  private backoffMs(retryAfterSec?: number, rateLimited = false): number {
     if (retryAfterSec !== undefined && retryAfterSec > 0) {
+      // 저쪽이 직접 말해준 시각이다. 우리 추측보다 이것이 맞다.
       return Math.min(MAX_BACKOFF_MS, retryAfterSec * 1000);
     }
     const exp = BASE_BACKOFF_MS * 2 ** Math.min(this.consecutiveFailures - 1, 6);
     // 여러 인스턴스가 동시에 재시도해 몰리지 않도록 약간 흩뿌린다.
     const jitter = Math.floor(Math.random() * 1000);
-    return Math.min(MAX_BACKOFF_MS, exp + jitter);
+    const floor = rateLimited ? RATE_LIMIT_MIN_BACKOFF_MS : 0;
+    return Math.min(MAX_BACKOFF_MS, Math.max(floor, exp + jitter));
+  }
+
+  /**
+   * 성공한 뒤 다음 조회까지의 간격.
+   *
+   * 조금 전에 429를 봤다면 평소 주기로 돌아가지 않는다. 한 번 성공했다고
+   * 곧바로 1분 주기로 복귀하면, 방금 막았던 쪽을 다시 같은 속도로 두드린다.
+   */
+  private nextIntervalMs(): number {
+    const sinceLimit = this.now() - this.lastRateLimitedAt;
+    if (this.lastRateLimitedAt > 0 && sinceLimit < RATE_LIMIT_CALM_MS) {
+      return Math.max(this.intervalMs, RATE_LIMIT_INTERVAL_MS);
+    }
+    return this.intervalMs;
   }
 
   private tick(): Promise<UsageSnapshot | null> {
@@ -188,16 +220,18 @@ export class UsagePoller {
 
       await this.evaluate(snapshot);
 
-      this.schedule(this.intervalMs);
+      this.schedule(this.nextIntervalMs());
       return snapshot;
     } catch (e) {
       this.consecutiveFailures += 1;
+      const rateLimited = e instanceof UsageError && e.code === 'rate_limited';
+      if (rateLimited) this.lastRateLimitedAt = this.now();
       const { message, willRetry } = this.classify(e);
       this.emit('error', e instanceof Error ? e : new Error(String(e)), message, willRetry);
 
       if (willRetry) {
         const retryAfter = e instanceof UsageError ? e.retryAfterSec : undefined;
-        this.schedule(this.backoffMs(retryAfter));
+        this.schedule(this.backoffMs(retryAfter, rateLimited));
       } else {
         // 토큰 만료처럼 스스로 못 고치는 상황. 사용자가 `claude` 를 실행하면
         // 파일이 바뀌므로, 느린 주기로는 계속 확인해 본다.

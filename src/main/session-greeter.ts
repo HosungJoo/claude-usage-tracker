@@ -19,6 +19,16 @@ import type { UsageSnapshot } from '../core/types.js';
 export const GREET_COOLDOWN_MS = 90_000;
 
 /**
+ * 조회가 실패했을 때 대신 쓸 수 있는 스냅샷의 최대 나이.
+ *
+ * 사용량 API는 429를 자주 낸다. 그때마다 입을 다물면, 정작 사용자가
+ * 세션을 여는 순간에만 조용해진다 — 이 앱이 존재하는 이유가 그 순간이다.
+ * 몇 분 전 숫자라도 "아무 말 없음"보다 낫다. 문구는 조회 시각을 기준으로
+ * 만들어지므로 남은 시간도 그때 기준으로 정확히 읽힌다.
+ */
+export const CACHED_GREET_MAX_AGE_MS = 10 * 60_000;
+
+/**
  * SessionStart는 세션을 새로 켤 때만이 아니라 /clear 나 컴팩션 후에도
  * 발생한다. 사용자가 '시작했다'고 느끼는 순간에만 인사한다.
  */
@@ -27,6 +37,11 @@ const GREETABLE_SOURCES = new Set(['startup', 'resume']);
 export interface GreeterDeps {
   /** 지금 사용량을 다시 읽어온다. 없으면(오류 등) null. */
   refresh: () => Promise<UsageSnapshot | null>;
+  /**
+   * 마지막으로 받아둔 사용량. 조회가 실패했을 때만 쓴다.
+   * 주지 않으면 실패는 곧 침묵이 된다.
+   */
+  cached?: () => UsageSnapshot | null;
   /**
    * 캐릭터를 띄운다.
    * @param cwd 세션의 작업 디렉터리. 어느 창 옆에 띄울지 정하는 데 쓴다.
@@ -65,7 +80,7 @@ export class SessionGreeter {
     const since = this.now() - this.lastGreetAt;
     const withinCooldown = this.lastGreetAt > 0 && since < GREET_COOLDOWN_MS;
 
-    const snapshot = await this.deps.refresh();
+    const snapshot = await this.snapshot();
     if (!snapshot) return;
 
     // 인사를 건너뛰더라도 세션 시작 시점은 기록해 둔다 —
@@ -85,12 +100,27 @@ export class SessionGreeter {
     this.sessionStart.delete(id);
     if (startPercent === undefined) return;
 
-    const snapshot = await this.deps.refresh();
+    const snapshot = await this.snapshot();
     if (!snapshot) return;
 
     const line = lineForSessionEnd(snapshot, startPercent, snapshot.fetchedAt);
     if (!line) return;
     this.deps.present(line, snapshot, event.cwd ?? null);
+  }
+
+  /**
+   * 인사에 쓸 사용량. 조회가 안 되면 최근 것으로 대신한다.
+   *
+   * 너무 낡은 숫자는 오히려 거짓말이 되므로 나이에 상한을 둔다.
+   */
+  private async snapshot(): Promise<UsageSnapshot | null> {
+    const fresh = await this.deps.refresh();
+    if (fresh) return fresh;
+
+    const cached = this.deps.cached?.() ?? null;
+    if (!cached) return null;
+    if (this.now() - cached.fetchedAt > CACHED_GREET_MAX_AGE_MS) return null;
+    return cached;
   }
 
   /** 추적 중인 세션 수. 진단용. */

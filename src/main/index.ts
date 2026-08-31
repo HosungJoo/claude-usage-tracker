@@ -321,6 +321,8 @@ function autostartCommand(): string {
 function startSessionHooks(): void {
   greeter = new SessionGreeter({
     refresh: async () => (await coordinator?.refresh()) ?? null,
+    // 429가 잦은 엔드포인트다. 조회가 막힌 순간에도 최근 숫자로는 인사한다.
+    cached: () => lastSnapshot,
     present: (line, snapshot, cwd) => {
       if (!store.value.greetOnSessionStart) return;
       present(line, snapshot.severity, snapshot, cwd);

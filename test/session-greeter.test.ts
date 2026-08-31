@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { GREET_COOLDOWN_MS, SessionGreeter } from '../src/main/session-greeter.js';
+import {
+  CACHED_GREET_MAX_AGE_MS,
+  GREET_COOLDOWN_MS,
+  SessionGreeter,
+} from '../src/main/session-greeter.js';
 import type { Line } from '../src/shared/character/script.js';
 import type { UsageSnapshot } from '../src/core/types.js';
 
@@ -169,5 +173,55 @@ describe('알 수 없는 이벤트', () => {
 
   it('빈 이벤트도 무시한다', async () => {
     await expect(h.greeter.handle({})).resolves.toBeUndefined();
+  });
+});
+
+/**
+ * 사용량 API는 429를 자주 낸다. 세션을 여는 그 순간에만 입을 다무는 것이
+ * 가장 나쁜 실패라서, 조회가 막히면 최근 숫자로 대신 인사한다.
+ */
+describe('조회가 막혔을 때', () => {
+  function withCache(cached: UsageSnapshot | null, now: number) {
+    const shown: Line[] = [];
+    let current = cached;
+    const greeter = new SessionGreeter({
+      refresh: async () => null, // 429
+      cached: () => current,
+      present: (line) => shown.push(line),
+      now: () => now,
+    });
+    return {
+      greeter,
+      shown,
+      setCached: (s: UsageSnapshot | null) => {
+        current = s;
+      },
+    };
+  }
+
+  it('최근 스냅샷이 있으면 그것으로 인사한다', async () => {
+    const { greeter, shown } = withCache(snap(30), T0 + 60_000);
+    await greeter.handle({ hook_event_name: 'SessionStart', source: 'startup', session_id: 's1' });
+    expect(shown).toHaveLength(1);
+  });
+
+  it('너무 낡은 숫자로는 인사하지 않는다 — 틀린 말이 되기 때문이다', async () => {
+    const { greeter, shown } = withCache(snap(30), T0 + CACHED_GREET_MAX_AGE_MS + 1);
+    await greeter.handle({ hook_event_name: 'SessionStart', source: 'startup', session_id: 's1' });
+    expect(shown).toHaveLength(0);
+  });
+
+  it('받아둔 것이 아예 없으면 조용히 물러난다', async () => {
+    const { greeter, shown } = withCache(null, T0);
+    await greeter.handle({ hook_event_name: 'SessionStart', source: 'startup', session_id: 's1' });
+    expect(shown).toHaveLength(0);
+  });
+
+  it('종료 요약도 최근 숫자로 낸다', async () => {
+    const { greeter, shown, setCached } = withCache(snap(30), T0 + 60_000);
+    await greeter.handle({ hook_event_name: 'SessionStart', source: 'startup', session_id: 's1' });
+    setCached(snap(45)); // 세션 동안 쓴 만큼
+    await greeter.handle({ hook_event_name: 'SessionEnd', session_id: 's1' });
+    expect(shown.length).toBeGreaterThan(1);
   });
 });
