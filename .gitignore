@@ -9,3 +9,5 @@ release/
 build/
 apps/vscode/out/
 .vscode-demo-profile/
+apps/vscode/*.vsix
+apps/vscode/icon.png

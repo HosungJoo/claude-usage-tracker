@@ -1,0 +1,5 @@
+# 번들만 들어간다. 원본은 저장소에 있다.
+src/**
+tsconfig*.json
+.vscodeignore
+**/*.map

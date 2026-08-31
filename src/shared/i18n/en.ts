@@ -223,6 +223,9 @@ export const en: Catalog = {
     autostartOff: 'Start on login disabled',
     autostartFailed: 'Could not change start-on-login',
     spoolFailed: (message) => `Could not start receiving events: ${message}`,
+    pollLeader: 'Polling usage in this process',
+    pollFollower: 'Another process is polling — reusing its result',
+    alertDeferred: (where) => `The VS Code panel took the ${where} alert`,
     checkNowFailed: 'Check now: could not read usage.',
   },
 };

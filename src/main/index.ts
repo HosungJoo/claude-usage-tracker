@@ -1,6 +1,8 @@
 import { app, screen, shell } from 'electron';
 import { join } from 'node:path';
 import { UsagePoller } from '../core/poller.js';
+import { PollCoordinator } from '../core/coordinator.js';
+import { isClaimedByOther } from '../core/focus-claim.js';
 import { normalizeUsage } from '../core/usage-api.js';
 import { loadCredentials } from '../core/credentials.js';
 import { gaugesFromSnapshot } from '../shared/ipc.js';
@@ -37,6 +39,7 @@ import type { Settings } from '../shared/settings.js';
 let host: WindowOverlayHost | null = null;
 let controller: OverlayController | null = null;
 let poller: UsagePoller | null = null;
+let coordinator: PollCoordinator | null = null;
 let spool: EventSpool | null = null;
 let greeter: SessionGreeter | null = null;
 let tray: UsageTray | null = null;
@@ -206,6 +209,7 @@ function watchDisplays(): void {
 /* ------------------------------------------------------------------ */
 
 function startPolling(): void {
+  void coordinator?.stop();
   poller?.stop();
   poller = new UsagePoller({
     intervalMs: store.value.pollIntervalSec * 1000,
@@ -222,7 +226,15 @@ function startPolling(): void {
     logger.info(
       t().log.thresholdCrossed(event.threshold, event.window, `${event.percent}%`),
     );
-    present(lineForThreshold(event, snapshot.fetchedAt), event.severity, snapshot);
+    void (async () => {
+      // VS Code 패널이 이 알림을 맡고 있으면 물러난다. 같은 말을 두 번
+      // 하는 것은 알림이 아니라 소음이다.
+      if (await isClaimedByOther(process.pid)) {
+        logger.info(t().log.alertDeferred(`${event.threshold}%`));
+        return;
+      }
+      present(lineForThreshold(event, snapshot.fetchedAt), event.severity, snapshot);
+    })();
   });
 
   poller.on('error', (_err, message, willRetry) => {
@@ -231,7 +243,12 @@ function startPolling(): void {
     logger.warn(`${message}${willRetry ? t().log.willRetry : ''}`);
   });
 
-  void poller.start();
+  // 조회는 한 프로세스만 한다. 자리를 못 잡으면 남의 결과를 받아 쓴다.
+  coordinator = new PollCoordinator({
+    poller,
+    onRole: (leader) => logger.info(leader ? t().log.pollLeader : t().log.pollFollower),
+  });
+  void coordinator.start();
 }
 
 /**
@@ -303,7 +320,7 @@ function autostartCommand(): string {
 
 function startSessionHooks(): void {
   greeter = new SessionGreeter({
-    refresh: async () => (await poller?.refreshNow()) ?? null,
+    refresh: async () => (await coordinator?.refresh()) ?? null,
     present: (line, snapshot, cwd) => {
       if (!store.value.greetOnSessionStart) return;
       present(line, snapshot.severity, snapshot, cwd);
@@ -323,7 +340,7 @@ function startSessionHooks(): void {
 
 /** 트레이의 '지금 확인'. 폴링 주기를 기다리지 않고 그 자리에서 읽는다. */
 async function checkNow(): Promise<void> {
-  const snapshot = (await poller?.refreshNow()) ?? lastSnapshot;
+  const snapshot = (await coordinator?.refresh()) ?? lastSnapshot;
   if (!snapshot) {
     logger.warn(t().log.checkNowFailed);
     return;
@@ -555,6 +572,7 @@ if (!app.requestSingleInstanceLock()) {
     host?.destroy();
     tray?.destroy();
     // 스풀 디렉터리를 지워야 훅이 '앱이 없다'를 알아챈다.
+    coordinator?.releaseSync();
     // before-quit은 프로미스를 기다리지 않으므로 동기로 지운다.
     spool?.stopSync();
   });

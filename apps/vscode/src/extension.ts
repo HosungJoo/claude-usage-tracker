@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { UsagePoller } from '../../../src/core/poller.js';
+import { PollCoordinator } from '../../../src/core/coordinator.js';
+import { clearFocusClaim, writeFocusClaim } from '../../../src/core/focus-claim.js';
 import { StateStore } from '../../../src/core/state-store.js';
 import { formatPercent, formatRemaining } from '../../../src/core/format.js';
 import type { ThresholdEvent } from '../../../src/core/thresholds.js';
@@ -31,6 +33,8 @@ import {
 
 const VIEW_ID = 'claudeUsage';
 const CHARACTER_VIEW_ID = 'claudeUsage.character';
+/** 표식 갱신 주기. 유효기간(25초)의 절반쯤이면 한 번 놓쳐도 끊기지 않는다. */
+const CLAIM_RENEW_MS = 10_000;
 /** 우리 뷰가 얹히는 컨테이너. Claude Code 확장이 선언한 id다. */
 const CLAUDE_CONTAINER = 'claude-sidebar-secondary';
 
@@ -106,6 +110,7 @@ class UsageModel implements vscode.Disposable {
   line: Line | null = null;
 
   private poller: UsagePoller | null = null;
+  private coordinator: PollCoordinator | null = null;
   private holdTimer: NodeJS.Timeout | null = null;
   private disposed = false;
 
@@ -115,6 +120,7 @@ class UsageModel implements vscode.Disposable {
     const settings = await appSettings();
     if (this.disposed) return;
 
+    await this.coordinator?.stop();
     this.poller?.stop();
     this.poller = new UsagePoller({
       intervalMs: config().get<number>('pollIntervalSec', settings.pollIntervalSec) * 1000,
@@ -133,7 +139,9 @@ class UsageModel implements vscode.Disposable {
       this.emitter.fire();
     });
 
-    await this.poller.start();
+    // 조회는 트레이 앱과 나눠 갖는다. 자리를 못 잡으면 남의 결과를 받아 쓴다.
+    this.coordinator = new PollCoordinator({ poller: this.poller });
+    await this.coordinator.start();
   }
 
   /** 설정이 바뀌면 폴러를 새로 만든다. 주기는 생성 시점에 고정되기 때문이다. */
@@ -142,7 +150,7 @@ class UsageModel implements vscode.Disposable {
   }
 
   async refresh(): Promise<void> {
-    await this.poller?.refreshNow();
+    await this.coordinator?.refresh();
   }
 
   private speak(event: ThresholdEvent): void {
@@ -203,6 +211,7 @@ class UsageModel implements vscode.Disposable {
 
   dispose(): void {
     this.disposed = true;
+    void this.coordinator?.stop();
     this.poller?.stop();
     if (this.holdTimer) clearTimeout(this.holdTimer);
     this.emitter.dispose();
@@ -396,6 +405,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
   );
 
+  // 이 창이 보이는 동안에는 알림을 우리가 맡는다고 적어둔다. 트레이 앱은
+  // 이것을 보고 전 화면 오버레이를 접는다 — 같은 말을 두 번 하지 않도록.
+  context.subscriptions.push(startFocusClaim());
+
   warnIfContainerMissing();
 
   // 개발 중 확인용. 실제 사용자의 패널을 확장이 마음대로 열지 않는다.
@@ -405,6 +418,49 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 
   await model.start();
+}
+
+
+/**
+ * 창이 포커스를 잡고 있는 동안 표식을 갱신한다.
+ *
+ * 표식의 유효기간은 짧다. VS Code가 강제 종료돼 파일이 남더라도 곧
+ * 힘을 잃어야 한다 — 남은 파일 하나 때문에 알림이 영영 안 뜨는 쪽이
+ * 훨씬 나쁘다. 패널이 알림을 맡지 않는 설정이면 표식도 적지 않는다.
+ */
+function startFocusClaim(): vscode.Disposable {
+  let timer: NodeJS.Timeout | null = null;
+
+  const stop = (): void => {
+    if (timer) clearInterval(timer);
+    timer = null;
+    void clearFocusClaim();
+  };
+
+  const renew = (): void => {
+    void writeFocusClaim(process.pid).catch(() => {
+      // 표식을 못 적으면 트레이 앱이 알린다. 최악이 아니라 원래 동작이다.
+    });
+  };
+
+  const apply = (): void => {
+    const takesAlerts = config().get<AlertMode>('alertInPanel', 'character') !== 'off';
+    if (vscode.window.state.focused && takesAlerts) {
+      if (timer === null) {
+        renew();
+        timer = setInterval(renew, CLAIM_RENEW_MS);
+      }
+      return;
+    }
+    stop();
+  };
+
+  apply();
+  const sub = vscode.window.onDidChangeWindowState(apply);
+  return new vscode.Disposable(() => {
+    sub.dispose();
+    stop();
+  });
 }
 
 /**

@@ -25,13 +25,16 @@
     "vscode:build": "esbuild apps/vscode/src/extension.ts --bundle --outfile=apps/vscode/out/extension.cjs --platform=node --format=cjs --target=node18 --external:vscode --sourcemap && esbuild apps/vscode/src/webview.ts --bundle --outfile=apps/vscode/out/webview.js --platform=browser --format=iife --target=es2020",
     "vscode:typecheck": "tsc --noEmit -p apps/vscode/tsconfig.json && tsc --noEmit -p apps/vscode/tsconfig.webview.json",
     "vscode:dev": "npm run vscode:build && code --extensionDevelopmentPath=$PWD/apps/vscode --new-window .",
-    "vscode:demo": "npm run vscode:build && rm -f \"${XDG_CONFIG_HOME:-$HOME/.config}\"/claude-usage-tracker/vscode-state.json && CUT_DEV_REVEAL=1 CUT_DEV_THRESHOLDS=1 CUT_DEV_HOLD_MS=45000 code --user-data-dir=.vscode-demo-profile --extensions-dir=\"$HOME/.vscode/extensions\" --extensionDevelopmentPath=$PWD/apps/vscode --new-window ."
+    "vscode:demo": "npm run vscode:build && rm -f \"${XDG_CONFIG_HOME:-$HOME/.config}\"/claude-usage-tracker/vscode-state.json && CUT_DEV_REVEAL=1 CUT_DEV_THRESHOLDS=1 CUT_DEV_HOLD_MS=45000 code --user-data-dir=.vscode-demo-profile --extensions-dir=\"$HOME/.vscode/extensions\" --extensionDevelopmentPath=$PWD/apps/vscode --new-window .",
+    "vscode:icon": "tsx tools/make-vscode-icon.ts",
+    "vscode:package": "npm run vscode:build && npm run vscode:icon && cd apps/vscode && vsce package --allow-missing-repository --skip-license"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
     "@types/vscode": "^1.134.0",
     "@typescript-eslint/eslint-plugin": "^8.18.0",
     "@typescript-eslint/parser": "^8.18.0",
+    "@vscode/vsce": "^3.9.2",
     "electron": "^33.4.11",
     "electron-builder": "^25.1.8",
     "electron-vite": "^2.3.0",

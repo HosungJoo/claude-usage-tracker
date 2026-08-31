@@ -223,5 +223,10 @@ export interface Catalog {
     autostartFailed: string;
     spoolFailed: (message: string) => string;
     checkNowFailed: string;
+    /** 사용량 조회를 이 프로세스가 맡았다 / 남에게 넘겼다. */
+    pollLeader: string;
+    pollFollower: string;
+    /** VS Code가 이 알림을 맡아서 오버레이를 띄우지 않았다. */
+    alertDeferred: (where: string) => string;
   };
 }

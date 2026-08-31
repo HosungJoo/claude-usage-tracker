@@ -4,7 +4,6 @@
   "description": "Claude Code 패널 머리줄에 사용량을 띄운다",
   "version": "0.1.0",
   "publisher": "hosungjoo",
-  "private": true,
   "license": "MIT",
   "engines": {
     "vscode": "^1.94.0"
@@ -86,5 +85,21 @@
         }
       }
     }
-  }
+  },
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HosungJoo/claude-usage-tracker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/HosungJoo/claude-usage-tracker/issues"
+  },
+  "homepage": "https://hosungjoo.github.io/claude-usage-tracker/",
+  "keywords": [
+    "claude",
+    "claude code",
+    "usage",
+    "rate limit",
+    "anthropic"
+  ]
 }

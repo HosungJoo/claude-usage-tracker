@@ -216,6 +216,9 @@ export const ko: Catalog = {
     autostartOff: '자동 시작 꺼짐',
     autostartFailed: '자동 시작 설정 실패',
     spoolFailed: (message) => `이벤트 수신을 시작하지 못했습니다: ${message}`,
+    pollLeader: '사용량 조회를 맡았습니다',
+    pollFollower: '다른 프로세스가 조회 중입니다 — 결과를 받아 씁니다',
+    alertDeferred: (where) => `${where} 알림은 VS Code 패널이 맡았습니다`,
     checkNowFailed: '지금 확인: 사용량을 읽지 못했습니다.',
   },
 };

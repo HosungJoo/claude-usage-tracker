@@ -121,6 +121,34 @@ export class UsagePoller {
     return this.inFlight ?? this.tick();
   }
 
+  /**
+   * 남이 받아온 스냅샷을 그대로 먹인다.
+   *
+   * 여러 프로세스가 같은 사용량을 각자 조회하면 API가 429로 막는다.
+   * 한 프로세스만 조회하고 나머지는 그 결과를 받아 쓰기 위한 입구다.
+   * 임계값 판정은 여기서도 똑같이 돈다 — 알림을 낼지 말지는 화면을
+   * 가진 쪽이 각자 정해야 하기 때문이다.
+   */
+  async ingest(snapshot: UsageSnapshot): Promise<void> {
+    this.consecutiveFailures = 0;
+    this.lastSnapshot = snapshot;
+    this.emit('snapshot', snapshot);
+    await this.evaluate(snapshot);
+  }
+
+  /** 스냅샷 하나로 임계값을 판정하고 이력을 남긴다. 조회 경로와 공유한다. */
+  private async evaluate(snapshot: UsageSnapshot): Promise<void> {
+    const prev = this.thresholdState ?? (await this.store.load());
+    const { events, state } = evaluateThresholds(snapshot, prev, {
+      ...(this.options.thresholds ? { thresholds: this.options.thresholds } : {}),
+      now: this.now(),
+    });
+    this.thresholdState = state;
+    await this.store.save(state, snapshot.fetchedAt);
+
+    for (const ev of events) this.emit('threshold', ev, snapshot);
+  }
+
   private schedule(delayMs: number): void {
     if (!this.running) return;
     if (this.timer) clearTimeout(this.timer);
@@ -158,15 +186,7 @@ export class UsagePoller {
       this.lastSnapshot = snapshot;
       this.emit('snapshot', snapshot);
 
-      const prev = this.thresholdState ?? (await this.store.load());
-      const { events, state } = evaluateThresholds(snapshot, prev, {
-        ...(this.options.thresholds ? { thresholds: this.options.thresholds } : {}),
-        now: this.now(),
-      });
-      this.thresholdState = state;
-      await this.store.save(state, snapshot.fetchedAt);
-
-      for (const ev of events) this.emit('threshold', ev, snapshot);
+      await this.evaluate(snapshot);
 
       this.schedule(this.intervalMs);
       return snapshot;
