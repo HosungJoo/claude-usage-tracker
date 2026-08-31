@@ -1,8 +1,7 @@
 import { t } from '../shared/i18n/index.js';
-import { PixelGrid } from '../shared/pixel/grid.js';
-import { encodePNG } from '../shared/pixel/png.js';
-import { buildFrame, SPRITE_H, SPRITE_W, type Expression } from '../shared/character/sprites.js';
-import type { Severity, UsageSnapshot } from '../core/types.js';
+import { expressionForSeverity, renderCharacter } from '../shared/character/render.js';
+import type { Expression } from '../shared/character/sprites.js';
+import type { UsageSnapshot } from '../core/types.js';
 
 /**
  * 트레이 아이콘을 캐릭터에서 직접 만든다.
@@ -18,65 +17,17 @@ import type { Severity, UsageSnapshot } from '../core/types.js';
 /** 트레이가 기대하는 크기. 대부분의 데스크톱 환경이 22~24px를 쓴다. */
 const TRAY_SIZE = 22;
 
-function expressionForSeverity(severity: Severity, percent: number): Expression {
-  if (percent >= 100) return 'faint';
-  if (severity === 'critical') return 'alert';
-  if (severity === 'warning') return 'worry';
-  return 'idle';
-}
-
 /**
- * 캐릭터를 주어진 정사각형 크기에 맞춰 그린다.
+ * 캐릭터를 트레이가 기대하는 정사각형에 맞춰 그린다.
  *
- * 정수 배율만 쓴다. 소수 배율로 늘리면 픽셀이 뭉개져서 트레이에서
- * 지저분한 얼룩으로 보인다.
+ * 그리는 일 자체는 `renderCharacter`가 한다 — 상태 표시줄 말풍선도 같은
+ * 그림을 쓰기 때문에, 한 곳에서만 굽는다.
  *
  * @param margin 가장자리에 남길 여백(px). 트레이는 이미 좁아서 0이지만,
  *   런처 아이콘은 아이콘끼리 붙어 보이지 않도록 조금 띄운다.
  */
-export function renderTrayIcon(
-  expression: Expression,
-  size = TRAY_SIZE,
-  margin = 0,
-): Uint8Array {
-  const frame = buildFrame({ expression, tick: 0 });
-
-  // 실제로 칠해진 영역만 잘라낸다. 캔버스 여백까지 넣으면 캐릭터가 작아진다.
-  let minX = SPRITE_W;
-  let minY = SPRITE_H;
-  let maxX = -1;
-  let maxY = -1;
-  for (let y = 0; y < SPRITE_H; y++) {
-    for (let x = 0; x < SPRITE_W; x++) {
-      if (frame.get(x, y) === null) continue;
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
-    }
-  }
-  const cropW = maxX - minX + 1;
-  const cropH = maxY - minY + 1;
-
-  // 여백을 뺀 안쪽 상자에 맞춘다. 여백이 커서 상자가 사라지면 무시한다 —
-  // 아무것도 안 그리는 아이콘보다 여백 없는 아이콘이 낫다.
-  const box = Math.max(1, size - margin * 2);
-  const scale = Math.max(1, Math.floor(Math.min(box / cropW, box / cropH)));
-  const drawW = cropW * scale;
-  const drawH = cropH * scale;
-  const offX = Math.floor((size - drawW) / 2);
-  const offY = Math.floor((size - drawH) / 2);
-
-  const out = new PixelGrid(size, size);
-  for (let y = 0; y < cropH; y++) {
-    for (let x = 0; x < cropW; x++) {
-      const p = frame.get(minX + x, minY + y);
-      if (p === null) continue;
-      out.rect(offX + x * scale, offY + y * scale, scale, scale, p);
-    }
-  }
-
-  return encodePNG(size, size, out.toRGBA());
+export function renderTrayIcon(expression: Expression, size = TRAY_SIZE, margin = 0): Uint8Array {
+  return renderCharacter(expression, size, size, margin);
 }
 
 /** 현재 사용량에 맞는 트레이 아이콘. */

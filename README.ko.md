@@ -56,7 +56,8 @@ npm run cli -- --install-hooks   # 리포에서
 
 **4. VS Code 확장** (선택)
 
-편집기 안에서도 같은 알림을 받습니다. Claude Code 패널 옆 사이드바에 뜹니다.
+편집기 안에서도 같은 알림을 받습니다. Claude Code 패널 옆 사이드바와 상태
+표시줄에 뜹니다 — Claude Code를 에디터 탭으로 써도 상태 표시줄에는 남습니다.
 
 ```bash
 code --install-extension hosungjoo.claude-usage-tracker-vscode

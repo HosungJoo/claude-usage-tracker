@@ -2,7 +2,7 @@
   "name": "claude-usage-tracker-vscode",
   "displayName": "Claude Usage Tracker for Claude Code",
   "description": "Claude Code 패널 머리줄에 사용량을 띄운다",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "publisher": "hosungjoo",
   "license": "MIT",
   "engines": {
@@ -71,17 +71,34 @@
         "claudeUsage.alertInPanel": {
           "type": "string",
           "enum": [
+            "notification",
             "character",
             "quiet",
             "off"
           ],
           "enumDescriptions": [
-            "캐릭터가 패널에 나와서 알리고, 시간이 지나면 사라진다",
-            "머리줄 문구만 바꾼다. 캐릭터는 나오지 않는다",
-            "패널에서는 알리지 않는다"
+            "오른쪽 아래 알림으로 뜬다. 사이드바를 열지 않아도 보인다",
+            "사이드바 패널에 캐릭터가 나와서 알리고, 시간이 지나면 사라진다",
+            "머리줄과 상태 표시줄 문구만 바꾼다. 팝업은 뜨지 않는다",
+            "이 확장은 알리지 않는다"
           ],
-          "default": "character",
-          "description": "임계값(트레이 앱의 설정을 따른다)을 넘었을 때 이 패널이 하는 일."
+          "default": "notification",
+          "description": "임계값(트레이 앱의 설정을 따른다)을 넘었을 때 이 확장이 하는 일. 어느 값이든 상태 표시줄 항목은 대사로 바뀌고, 거기 마우스를 올리면 캐릭터가 있다."
+        },
+        "claudeUsage.statusBar": {
+          "type": "string",
+          "enum": [
+            "always",
+            "alertOnly",
+            "off"
+          ],
+          "enumDescriptions": [
+            "상태 표시줄에 사용량을 계속 띄운다",
+            "임계값을 넘었을 때만 상태 표시줄에 나온다",
+            "상태 표시줄에는 아무것도 띄우지 않는다"
+          ],
+          "default": "always",
+          "description": "상태 표시줄 오른쪽에 두는 사용량 한 줄. Claude Code를 에디터 탭으로 쓰면 사이드바 뷰가 화면에 없으므로 여기가 유일한 자리다."
         }
       }
     }

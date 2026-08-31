@@ -48,7 +48,9 @@ cross a threshold **the character comes to you.** You do nothing.
 - **Tray at a glance.** The tray icon is generated from the character itself and
   changes expression with your usage level.
 - **Comes to VS Code too.** A companion extension puts the same character and
-  numbers in the sidebar beside the Claude Code panel — no window switch.
+  numbers in the sidebar beside the Claude Code panel — and a one-line reading in
+  the status bar, so it is there even when Claude Code is an editor tab. No
+  window switch either way.
 - **Speaks English or Korean.** Follows your desktop language by default; you can
   pin either one in Settings. Every surface is translated — the character's lines,
   the tray, the settings window, errors, the CLI, and the log file you would send
@@ -79,8 +81,8 @@ npm run cli -- --install-hooks    # from a clone of this repo
 **Optional — start on login.** Tray → *Settings* → *Start on login*.
 Writes an XDG autostart entry.
 
-**Optional — VS Code extension.** The same alerts inside the editor, in the
-sidebar next to the Claude Code panel:
+**Optional — VS Code extension.** The same alerts inside the editor — in the
+sidebar next to the Claude Code panel, and in the status bar:
 
 ```bash
 code --install-extension hosungjoo.claude-usage-tracker-vscode

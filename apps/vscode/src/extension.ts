@@ -15,6 +15,11 @@ import {
   type Settings,
 } from '../../../src/shared/settings.js';
 import { lineForThreshold, type Line } from '../../../src/shared/character/script.js';
+import {
+  expressionForSeverity,
+  renderCharacterAnimation,
+} from '../../../src/shared/character/render.js';
+import type { Expression } from '../../../src/shared/character/sprites.js';
 import { gaugesFromSnapshot, type GaugeInfo } from '../../../src/shared/ipc.js';
 import {
   resolveLocale,
@@ -47,7 +52,12 @@ const CLAUDE_CONTAINER = 'claude-sidebar-secondary';
  */
 const STATE_FILE = 'vscode-state.json';
 
-type AlertMode = 'character' | 'quiet' | 'off';
+type AlertMode = 'notification' | 'character' | 'quiet' | 'off';
+type StatusBarMode = 'always' | 'alertOnly' | 'off';
+
+/** 말풍선 속 캐릭터 크기. 스프라이트(24×16)의 정수 배율이라야 선명하다. */
+const PORTRAIT_W = 96;
+const PORTRAIT_H = 64;
 
 interface Row {
   label: string;
@@ -154,7 +164,7 @@ class UsageModel implements vscode.Disposable {
   }
 
   private speak(event: ThresholdEvent): void {
-    const mode = config().get<AlertMode>('alertInPanel', 'character');
+    const mode = config().get<AlertMode>('alertInPanel', 'notification');
     if (mode === 'off') return;
 
     const line = lineForThreshold(event);
@@ -256,6 +266,138 @@ class UsageTreeProvider implements vscode.TreeDataProvider<Row> {
 }
 
 /* ------------------------------------------------------------------ */
+/* 상태 표시줄 — 사이드바를 열지 않는 사람의 자리                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 우리 뷰는 Claude Code 확장이 만든 보조 사이드바 컨테이너에 얹혀 있다.
+ * 그런데 Claude Code는 에디터 탭으로도 열린다. 그렇게 쓰는 사람의 화면에는
+ * 컨테이너 자체가 없고, 따라서 우리 뷰도 없다 — 확장을 깔았는데 아무것도
+ * 안 나오는 것처럼 보인다.
+ *
+ * 상태 표시줄은 어느 창에나 항상 있는 유일한 자리다. 그래서 숫자 한 줄은
+ * 여기에도 둔다. 사이드바를 여는 사람에게는 같은 숫자가 두 곳에 보이지만,
+ * 둘 다 한 줄짜리라 서로를 가리지 않는다.
+ */
+class UsageStatusBar implements vscode.Disposable {
+  private readonly item: vscode.StatusBarItem;
+
+  constructor(private readonly model: UsageModel) {
+    this.item = vscode.window.createStatusBarItem(
+      'claudeUsage.status',
+      vscode.StatusBarAlignment.Right,
+      100,
+    );
+    // 누르면 지금 확인한다. 상태 표시줄에서 할 수 있는 일이 하나뿐이라면
+    // 그건 '다시 읽기'여야 한다 — 숫자가 낡아 보일 때 손이 가는 곳이니까.
+    this.item.command = 'claudeUsage.refresh';
+  }
+
+  paint(): void {
+    const mode = config().get<StatusBarMode>('statusBar', 'always');
+    const line = this.model.line;
+    if (mode === 'off' || (mode === 'alertOnly' && line === null)) {
+      this.item.hide();
+      return;
+    }
+
+    // 언어는 도중에 바뀔 수 있다. 이름까지 매번 다시 적는다.
+    this.item.name = t().statusBar.name;
+    // 아직 한 번도 못 읽었으면 머리줄이 비어 있다. 아이콘만 남기지 않고
+    // 줄표를 세워, 자리는 잡혔고 숫자만 아직이라는 것을 보이게 한다.
+    this.item.text = line
+      ? `$(bell) ${line.title}`
+      : `$(pulse) ${this.model.headline() || '—'}`;
+    this.item.tooltip = this.tooltip();
+    this.item.color = this.foreground();
+    // 배경까지 물들이는 건 알림이 떠 있는 동안뿐이다. 90%에 계속 빨간 블록이
+    // 박혀 있으면 그건 알림이 아니라 배경이 되고, 배경은 아무도 안 본다.
+    this.item.backgroundColor = line ? this.background() : undefined;
+    this.item.show();
+  }
+
+  /** 심각도는 색으로만 말한다 — 트리 뷰의 점과 같은 색을 쓴다. */
+  private foreground(): vscode.ThemeColor | undefined {
+    switch (this.severity()) {
+      case 'critical':
+        return new vscode.ThemeColor('charts.red');
+      case 'warning':
+        return new vscode.ThemeColor('charts.yellow');
+      default:
+        return undefined;
+    }
+  }
+
+  private background(): vscode.ThemeColor {
+    return new vscode.ThemeColor(
+      this.severity() === 'critical'
+        ? 'statusBarItem.errorBackground'
+        : 'statusBarItem.warningBackground',
+    );
+  }
+
+  private severity(): Severity {
+    return this.model.snapshot?.severity ?? 'normal';
+  }
+
+  /**
+   * 말풍선에는 뷰가 펼쳐졌을 때 보여줄 것을 그대로 적는다. 사이드바를 열지
+   * 않는 사람도 같은 것을 볼 수 있어야 두 자리가 서로를 대신한다.
+   *
+   * 캐릭터도 여기 들어간다. 상태 표시줄 항목 자체에는 아이콘 폰트밖에 못
+   * 넣지만, 말풍선은 마크다운이라 그림이 들어간다 — 창 모양을 하나도 안
+   * 바꾸면서 캐릭터를 보여줄 수 있는 유일한 자리다.
+   */
+  private tooltip(): vscode.MarkdownString {
+    const md = new vscode.MarkdownString();
+    md.appendMarkdown(`**${t().statusBar.name}**\n\n`);
+
+    const line = this.model.line;
+    md.appendMarkdown(`![](${this.portrait()})\n\n`);
+    if (line) md.appendMarkdown(`${line.title} — ${line.detail}\n\n`);
+
+    const rows = this.model.rows();
+    if (rows.length > 0) {
+      for (const row of rows) md.appendMarkdown(`${row.label} · ${row.detail}\n\n`);
+    } else if (this.model.error !== null) {
+      md.appendMarkdown(`${this.model.error}\n\n`);
+    }
+
+    md.appendMarkdown(`_${t().statusBar.tooltipHint}_`);
+    return md;
+  }
+
+  /**
+   * 지금 표정의 캐릭터를 data URI로 굽는다.
+   *
+   * 알림이 떠 있으면 그 대사의 표정을, 아니면 숫자에서 나온 표정을 쓴다 —
+   * 트레이 아이콘이 고르는 것과 같은 규칙이다. 4배 정수 배율로만 늘려서
+   * 픽셀 경계를 살린다.
+   *
+   * APNG로 굽는다. 말풍선은 마크다운이라 스크립트가 없지만, 움직이는 그림
+   * 한 장은 브라우저가 알아서 돌려준다 — 말풍선 안의 캐릭터도 숨을 쉰다.
+   */
+  private portrait(): string {
+    const line = this.model.line;
+    const snapshot = this.model.snapshot;
+    // 개발 중 확인용. 지금 사용량이 16%인데 기절한 얼굴을 볼 수는 없다.
+    const expression =
+      (process.env['CUT_DEV_EXPRESSION'] as Expression | undefined) ??
+      line?.expression ??
+      expressionForSeverity(
+        snapshot?.severity ?? 'normal',
+        snapshot ? Math.max(snapshot.fiveHour.percent, snapshot.weekly.percent) : 0,
+      );
+    const png = renderCharacterAnimation(expression, PORTRAIT_W, PORTRAIT_H);
+    return `data:image/png;base64,${Buffer.from(png).toString('base64')}`;
+  }
+
+  dispose(): void {
+    this.item.dispose();
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* 캐릭터 — 알림이 떠 있는 동안에만 존재하는 뷰                        */
 /* ------------------------------------------------------------------ */
 
@@ -352,9 +494,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
   context.subscriptions.push(view);
 
+  const status = new UsageStatusBar(model);
+  context.subscriptions.push(status);
+
   const paint = (): void => {
     // 접혀 있어도 머리줄은 갱신된다 — 이 확장이 웹뷰가 아니라 트리 뷰인 이유다.
     view.description = model.headline();
+    status.paint();
     // 아직 한 번도 못 읽었을 때만 뷰 안쪽에 사유를 적는다. 낡은 숫자가
     // 남아 있다면 그것을 지우면서까지 오류를 알릴 이유가 없다.
     if (model.snapshot === null && model.error !== null) view.message = model.error;
@@ -381,7 +527,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   context.subscriptions.push(
     model.onDidAlert((line) => {
-      if (config().get<AlertMode>('alertInPanel', 'character') !== 'character') return;
+      const mode = config().get<AlertMode>('alertInPanel', 'notification');
+      if (mode === 'notification') {
+        announce(line, model.snapshot?.severity ?? 'normal');
+        return;
+      }
+      if (mode !== 'character') return;
       character.say(line, model.snapshot ? gaugesFromSnapshot(model.snapshot) : []);
       setAlerting(true);
     }),
@@ -401,6 +552,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         applyLocale();
         paint();
       }
+      if (e.affectsConfiguration('claudeUsage.statusBar')) status.paint();
       if (e.affectsConfiguration('claudeUsage.pollIntervalSec')) void model.restart();
     }),
   );
@@ -408,6 +560,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // 이 창이 보이는 동안에는 알림을 우리가 맡는다고 적어둔다. 트레이 앱은
   // 이것을 보고 전 화면 오버레이를 접는다 — 같은 말을 두 번 하지 않도록.
   context.subscriptions.push(startFocusClaim());
+
+  // 첫 조회 전에도 자리를 잡아 둔다. 확장이 살아 있다는 유일한 증거다.
+  paint();
 
   warnIfContainerMissing();
 
@@ -420,6 +575,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   await model.start();
 }
 
+
+/**
+ * 임계값을 오른쪽 아래 알림으로 알린다.
+ *
+ * 데스크톱 앱은 모든 화면을 덮는다 — 하던 일에서 눈을 떼게 만드는 것이
+ * 목적이니 그게 맞다. 하지만 편집기 안에서는 그 세기가 과하다. 여기서
+ * 원하는 건 "창을 바꾸지 않고, 보던 자리 근처에서" 알리는 것이고,
+ * VS Code에서 코드로 띄울 수 있는 팝업은 이 알림 하나뿐이다 —
+ * 상태 표시줄 말풍선을 대신 열어주는 API는 없다.
+ *
+ * 그림은 못 넣는다. 대신 같은 순간 상태 표시줄 항목이 이 대사로 바뀌고,
+ * 거기에 마우스를 올리면 움직이는 캐릭터가 있다.
+ *
+ * 다 쓴 순간만 남는 알림을 쓴다. 나머지는 스스로 사라진다 — 읽고 나서도
+ * 남아 있는 알림은 알림이 아니라 치워야 할 물건이다.
+ */
+function announce(line: Line, severity: Severity): void {
+  const text = `${line.title} — ${line.detail}`;
+  if (severity === 'critical') void vscode.window.showWarningMessage(text);
+  else void vscode.window.showInformationMessage(text);
+}
 
 /**
  * 창이 포커스를 잡고 있는 동안 표식을 갱신한다.
@@ -444,7 +620,7 @@ function startFocusClaim(): vscode.Disposable {
   };
 
   const apply = (): void => {
-    const takesAlerts = config().get<AlertMode>('alertInPanel', 'character') !== 'off';
+    const takesAlerts = config().get<AlertMode>('alertInPanel', 'notification') !== 'off';
     if (vscode.window.state.focused && takesAlerts) {
       if (timer === null) {
         renew();

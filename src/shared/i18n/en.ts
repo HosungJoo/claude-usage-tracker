@@ -69,6 +69,11 @@ export const en: Catalog = {
     resetsIn: (left) => `resets in ${left}`,
   },
 
+  statusBar: {
+    name: 'Claude usage',
+    tooltipHint: 'Click to check now',
+  },
+
   error: {
     authRejected: 'Authentication was rejected. Run `claude` once to refresh your token.',
     rateLimited: 'Too many requests. Retrying shortly.',

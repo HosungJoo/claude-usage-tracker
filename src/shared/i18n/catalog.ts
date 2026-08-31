@@ -75,6 +75,17 @@ export interface Catalog {
     resetsIn: (left: string) => string;
   };
 
+  /**
+   * 상태 표시줄 항목. Claude Code를 에디터 탭으로 쓰면 사이드바 뷰가 화면에
+   * 없다 — 그때는 여기가 사용량을 볼 수 있는 유일한 자리다.
+   */
+  statusBar: {
+    /** 상태 표시줄을 우클릭했을 때 뜨는 항목 이름. 말풍선 첫 줄이기도 하다. */
+    name: string;
+    /** 말풍선 마지막 줄. 누르면 무슨 일이 생기는지. */
+    tooltipHint: string;
+  };
+
   /** 사용자에게 보이는 오류. 무엇을 하면 풀리는지까지 적는다. */
   error: {
     authRejected: string;
