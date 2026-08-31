@@ -21,6 +21,16 @@ files:
 # 네이티브 모듈이 없다. 매 빌드마다 도는 rebuild는 시간만 쓴다.
 npmRebuild: false
 
+# 기본(store)보다 느리지만 더 줄인다. AppImage는 한 번 만들어 여러 번
+# 내려받는 파일이라, 빌드 몇 초보다 내려받는 쪽 시간이 값싸다.
+compression: maximum
+
+# 기본으로 55개 로케일이 들어가 40MB를 차지한다. 이 앱의 문구는 한국어
+# 하나뿐이고 나머지는 Chromium 내장 UI(오른쪽 클릭 메뉴 등)에만 쓰인다.
+electronLanguages:
+  - ko
+  - en-US
+
 linux:
   target:
     - AppImage
