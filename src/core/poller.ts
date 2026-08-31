@@ -57,7 +57,8 @@ export class UsagePoller {
 
   private timer: NodeJS.Timeout | null = null;
   private running = false;
-  private inFlight = false;
+  /** 진행 중인 조회. 겹쳐 부르면 이것을 같이 기다린다. */
+  private inFlight: Promise<UsageSnapshot | null> | null = null;
   private consecutiveFailures = 0;
   private thresholdState: ThresholdState | null = null;
   private lastSnapshot: UsageSnapshot | null = null;
@@ -109,11 +110,14 @@ export class UsagePoller {
 
   /**
    * 지금 즉시 한 번 조회한다. 트레이의 "지금 확인"과 세션 시작 훅이 부른다.
-   * 이미 조회 중이면 중복 요청하지 않는다.
+   *
+   * 이미 조회 중이면 **그 조회를 같이 기다린다.** 중복 요청을 하지 않는 건
+   * 같지만, 기다리지 않고 마지막 스냅샷을 돌려주면 시작 직후에 null이 된다 —
+   * 첫 조회가 끝나기 전에 세션 훅이 들어오는 상황이 정확히 그렇고, 부르는
+   * 쪽은 그 null을 '조회 실패'로 보고 인사를 통째로 건너뛴다.
    */
   async refreshNow(): Promise<UsageSnapshot | null> {
-    if (this.inFlight) return this.lastSnapshot;
-    return this.tick();
+    return this.inFlight ?? this.tick();
   }
 
   private schedule(delayMs: number): void {
@@ -133,9 +137,20 @@ export class UsagePoller {
     return Math.min(MAX_BACKOFF_MS, exp + jitter);
   }
 
-  private async tick(): Promise<UsageSnapshot | null> {
-    if (!this.running && this.timer !== null) return this.lastSnapshot;
-    this.inFlight = true;
+  private tick(): Promise<UsageSnapshot | null> {
+    if (!this.running && this.timer !== null) return Promise.resolve(this.lastSnapshot);
+
+    const run = this.runTick();
+    this.inFlight = run;
+    // 성공이든 실패든 자리를 비운다. 다음 조회가 이 결과에 묶이면 안 된다.
+    const clear = (): void => {
+      if (this.inFlight === run) this.inFlight = null;
+    };
+    void run.then(clear, clear);
+    return run;
+  }
+
+  private async runTick(): Promise<UsageSnapshot | null> {
     try {
       const snapshot = await getUsageSnapshot(this.options);
       this.consecutiveFailures = 0;
@@ -168,8 +183,6 @@ export class UsagePoller {
         this.schedule(MAX_BACKOFF_MS);
       }
       return null;
-    } finally {
-      this.inFlight = false;
     }
   }
 
