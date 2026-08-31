@@ -1,0 +1,90 @@
+{
+  "name": "claude-usage-tracker-vscode",
+  "displayName": "Claude Usage Tracker",
+  "description": "Claude Code 패널 머리줄에 사용량을 띄운다",
+  "version": "0.1.0",
+  "publisher": "hosungjoo",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.94.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.cjs",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "views": {
+      "claude-sidebar-secondary": [
+        {
+          "type": "webview",
+          "id": "claudeUsage.character",
+          "name": "Claude 사용량",
+          "when": "claudeUsage.alerting"
+        },
+        {
+          "id": "claudeUsage",
+          "name": "Claude 사용량",
+          "visibility": "collapsed",
+          "when": "!claudeUsage.alerting"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "claudeUsage.refresh",
+        "title": "Claude 사용량: 지금 확인",
+        "icon": "$(refresh)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "claudeUsage.refresh",
+          "when": "view == claudeUsage",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Claude Usage Tracker",
+      "properties": {
+        "claudeUsage.pollIntervalSec": {
+          "type": "number",
+          "default": 60,
+          "minimum": 15,
+          "maximum": 600,
+          "description": "사용량을 다시 읽는 주기(초). 트레이 앱의 설정보다 이 값이 우선한다."
+        },
+        "claudeUsage.language": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "en",
+            "ko"
+          ],
+          "default": "auto",
+          "description": "표시 언어. auto는 VS Code 표시 언어를 따른다."
+        },
+        "claudeUsage.alertInPanel": {
+          "type": "string",
+          "enum": [
+            "character",
+            "quiet",
+            "off"
+          ],
+          "enumDescriptions": [
+            "캐릭터가 패널에 나와서 알리고, 시간이 지나면 사라진다",
+            "머리줄 문구만 바꾼다. 캐릭터는 나오지 않는다",
+            "패널에서는 알리지 않는다"
+          ],
+          "default": "character",
+          "description": "임계값(트레이 앱의 설정을 따른다)을 넘었을 때 이 패널이 하는 일."
+        }
+      }
+    }
+  }
+}

@@ -7,3 +7,5 @@ release/
 .env
 .vitest-cache/
 build/
+apps/vscode/out/
+.vscode-demo-profile/

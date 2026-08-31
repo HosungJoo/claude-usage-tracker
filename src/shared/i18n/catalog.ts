@@ -64,6 +64,17 @@ export interface Catalog {
     tooltip: (five: string, week: string) => string;
   };
 
+  /** VS Code 확장의 사용량 뷰. 접혀 있을 때는 머리줄 한 줄이 전부다. */
+  view: {
+    /** 머리줄 오른쪽. 접힌 상태에서도 이것만은 보인다 — 짧게. */
+    description: (five: string, week: string) => string;
+    /** 조회 실패 시 머리줄. 숫자 자리에 들어가므로 한두 낱말. */
+    descriptionError: string;
+    fiveHourRow: (percent: string) => string;
+    weeklyRow: (percent: string) => string;
+    resetsIn: (left: string) => string;
+  };
+
   /** 사용자에게 보이는 오류. 무엇을 하면 풀리는지까지 적는다. */
   error: {
     authRejected: string;

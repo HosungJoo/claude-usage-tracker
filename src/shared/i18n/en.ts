@@ -61,6 +61,14 @@ export const en: Catalog = {
     tooltip: (five, week) => `Claude usage — 5-hour ${five} · weekly ${week}`,
   },
 
+  view: {
+    description: (five, week) => `5h ${five} · 7d ${week}`,
+    descriptionError: 'unavailable',
+    fiveHourRow: (percent) => `5-hour  ${percent}`,
+    weeklyRow: (percent) => `Weekly  ${percent}`,
+    resetsIn: (left) => `resets in ${left}`,
+  },
+
   error: {
     authRejected: 'Authentication was rejected. Run `claude` once to refresh your token.',
     rateLimited: 'Too many requests. Retrying shortly.',
