@@ -1,6 +1,6 @@
 # Claude Usage Tracker
 
-[English →](README.md) · [웹사이트](https://hosungju.github.io/claude-usage-tracker/ko/)
+[English →](README.md) · [웹사이트](https://hosungjoo.github.io/claude-usage-tracker/ko/)
 
 픽셀 클로드 캐릭터가 Claude 사용량을 **먼저** 알려주는 데스크톱 앱.
 

@@ -6,7 +6,7 @@
 
 appId: cc.supergate.claude-usage-tracker
 productName: Claude Usage Tracker
-copyright: © 2026 HosungJu
+copyright: © 2026 HosungJoo
 
 directories:
   output: release

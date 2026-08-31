@@ -5,12 +5,12 @@ A Linux desktop tray app that reads the official Claude usage API and pops up on
 your screen when you hit 50%, 70%, 90% and 100% — so you never discover the
 limit by being cut off mid-task.
 
-[![Release](https://img.shields.io/github/v/release/HosungJu/claude-usage-tracker?label=download&color=brightgreen)](https://github.com/HosungJu/claude-usage-tracker/releases/latest)
+[![Release](https://img.shields.io/github/v/release/HosungJoo/claude-usage-tracker?label=download&color=brightgreen)](https://github.com/HosungJoo/claude-usage-tracker/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Linux-informational)](#install)
-[![AppImage](https://img.shields.io/badge/AppImage-70%20MiB-blue)](https://github.com/HosungJu/claude-usage-tracker/releases/latest)
+[![AppImage](https://img.shields.io/badge/AppImage-70%20MiB-blue)](https://github.com/HosungJoo/claude-usage-tracker/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
-[한국어 문서 →](README.ko.md) · [Website](https://hosungju.github.io/claude-usage-tracker/)
+[한국어 문서 →](README.ko.md) · [Website](https://hosungjoo.github.io/claude-usage-tracker/)
 
 ![Claude Usage Tracker greeting overlay](docs/greeting.png)
 
@@ -54,7 +54,7 @@ cross a threshold **the character comes to you.** You do nothing.
 
 ## Install
 
-Download the AppImage from the [latest release](https://github.com/HosungJu/claude-usage-tracker/releases/latest):
+Download the AppImage from the [latest release](https://github.com/HosungJoo/claude-usage-tracker/releases/latest):
 
 ```bash
 chmod +x claude-usage-tracker-*-x86_64.AppImage
