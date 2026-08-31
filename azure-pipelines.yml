@@ -1,8 +1,17 @@
-# CI — 커밋마다 검사하고, 태그를 밀면 AppImage를 낸다.
+# CI — 커밋마다 검사하고, 태그를 밀면 내놓는다.
 #
-# 두 단계로 나눈 이유: 검사는 모든 푸시·PR에서 돌아야 하지만 패키징은
-# 108MB를 만들어 내는 일이라 릴리스할 때만 돈다. Verify가 실패하면
-# Package는 아예 시작하지 않는다.
+# 단계를 나눈 이유: 검사는 모든 푸시·PR에서 돌아야 하지만 내놓는 일은
+# 릴리스할 때만 돈다. Verify가 실패하면 그 뒤는 아예 시작하지 않는다.
+#
+# 내놓는 물건이 둘이고 버전이 따로 논다 — 데스크톱 앱과 VS Code 확장이다.
+# 그래서 태그도 둘로 나눈다:
+#
+#   v0.3.2         → 데스크톱 앱. AppImage를 굽는다.
+#   vscode-v0.2.0  → VS Code 확장. 마켓플레이스에 올린다.
+#
+# 접두사를 붙인 쪽이 `v*` 글롭에도 걸리므로, 앱 조건에서는 명시적으로
+# 빼야 한다. 안 그러면 확장 태그를 밀 때마다 AppImage 잡이 버전 확인에서
+# 죽는다.
 
 trigger:
   branches:
@@ -21,8 +30,9 @@ pool:
   vmImage: ubuntu-latest
 
 variables:
-  # 태그 푸시일 때만 패키징한다.
-  isRelease: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/v')]
+  # 태그 푸시일 때만 내놓는다. 두 태그는 서로를 밟지 않는다.
+  isAppRelease: $[and(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), not(startsWith(variables['Build.SourceBranch'], 'refs/tags/vscode-')))]
+  isExtRelease: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/vscode-v')]
 
 stages:
   - stage: Verify
@@ -56,7 +66,7 @@ stages:
   - stage: Package
     displayName: 패키징
     dependsOn: Verify
-    condition: and(succeeded(), eq(variables.isRelease, true))
+    condition: and(succeeded(), eq(variables.isAppRelease, true))
     jobs:
       - job: AppImage
         displayName: AppImage 빌드
@@ -100,3 +110,45 @@ stages:
           - publish: $(Build.ArtifactStagingDirectory)
             artifact: appimage
             displayName: 아티팩트 퍼블리시
+
+  - stage: PublishExtension
+    displayName: 확장 게시
+    dependsOn: Verify
+    condition: and(succeeded(), eq(variables.isExtRelease, true))
+    jobs:
+      - job: Marketplace
+        displayName: 마켓플레이스에 올린다
+        steps:
+          - task: NodeTool@0
+            displayName: Node 설치
+            inputs:
+              versionSpec: '20.x'
+
+          - script: npm ci
+            displayName: 의존성 설치
+
+          # 태그가 vscode-v0.2.0 이면 apps/vscode/package.json도 0.2.0 이어야
+          # 한다. 마켓플레이스는 같은 버전을 두 번 받지 않으므로, 어긋난 채로
+          # 올라가면 되돌릴 수 없다.
+          - script: |
+              tag="${BUILD_SOURCEBRANCHNAME#vscode-v}"
+              pkg=$(node -p "require('./apps/vscode/package.json').version")
+              if [ "$tag" != "$pkg" ]; then
+                echo "##vso[task.logissue type=error]태그 vscode-v$tag 와 apps/vscode/package.json $pkg 가 다릅니다"
+                exit 1
+              fi
+              echo "확장 버전 $pkg"
+            displayName: 버전 확인
+
+          # 올리기 전에 토큰부터 확인한다. 빌드까지 다 해 놓고 마지막 줄에서
+          # 인증으로 죽는 것보다, 5초 만에 아는 편이 낫다.
+          - script: npx vsce verify-pat hosungjoo
+            displayName: 토큰 확인
+            env:
+              VSCE_PAT: $(VSCE_PAT)
+
+          - script: npm run vscode:publish
+            displayName: 게시
+            env:
+              # 파이프라인의 비밀 변수. 로그에 찍히지 않는다.
+              VSCE_PAT: $(VSCE_PAT)

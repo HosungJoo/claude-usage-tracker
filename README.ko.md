@@ -16,7 +16,8 @@
 ## 현재 상태
 
 M5 (Package & Release) 완료 — AppImage로 묶어 내려받아 바로 실행합니다.
-커밋마다 CI가 검사하고, `v*` 태그를 밀면 AppImage 아티팩트가 나옵니다.
+커밋마다 CI가 검사하고, `v*` 태그를 밀면 AppImage 아티팩트가, `vscode-v*`
+태그를 밀면 확장이 마켓플레이스에 올라갑니다.
 
 ## 설치
 
@@ -380,7 +381,7 @@ tools/
   check-transparency.cjs   오버레이 투명도 검사
 
 electron-builder.yml       AppImage 패키징
-azure-pipelines.yml        CI(검사) + 릴리스(태그 → AppImage)
+azure-pipelines.yml        CI(검사) + 릴리스(v* → AppImage, vscode-v* → 마켓플레이스)
 docs/                      README에 쓰는 장면 스크린샷 (npm run shots)
 ```
 
@@ -450,20 +451,34 @@ asar 131KB입니다. 빈 Electron 앱을 같은 설정으로 빌드하면 72.8Mi
 |---|---|---|
 | Verify | 모든 푸시 · PR | lint → typecheck → test → build |
 | Package | `v*` 태그 | 버전 확인 → AppImage → 아티팩트 |
+| PublishExtension | `vscode-v*` 태그 | 버전 확인 → 토큰 확인 → 마켓플레이스 게시 |
 
-나눈 이유: 검사는 매번 돌아야 하지만 패키징은 100MB를 만들어 내는 일이라
-릴리스할 때만 돕니다. Verify가 실패하면 Package는 시작하지 않습니다.
+나눈 이유: 검사는 매번 돌아야 하지만 내놓는 일은 릴리스할 때만 돕니다.
+Verify가 실패하면 그 뒤는 시작하지 않습니다.
 
-릴리스하려면 `package.json` 버전을 올리고 같은 이름의 태그를 밉니다.
+**내놓는 물건이 둘이고 버전이 따로 놉니다** — 데스크톱 앱(`package.json`)과
+VS Code 확장(`apps/vscode/package.json`). 그래서 태그도 둘입니다.
 
 ```bash
-npm version 0.2.0    # package.json + 태그 v0.2.0
+# 데스크톱 앱
+npm version 0.3.2                    # package.json + 태그 v0.3.2
 git push --follow-tags
+
+# VS Code 확장
+git tag vscode-v0.2.0                # apps/vscode/package.json 을 먼저 올려 둘 것
+git push origin vscode-v0.2.0
 ```
 
-Package 단계가 태그와 `package.json` 버전이 같은지 먼저 확인하고, 다르면
-빌드를 시작하기 전에 멈춥니다. 어긋난 채로 릴리스가 나가면 나중에 어느
-쪽이 맞는지 알 수 없기 때문입니다.
+접두사를 붙인 쪽도 `v*` 글롭에 걸리므로, 앱 조건에서 `vscode-` 를 명시적으로
+뺐습니다. 그러지 않으면 확장 태그를 밀 때마다 AppImage 잡이 버전 확인에서
+죽습니다.
+
+두 단계 모두 태그와 해당 `package.json` 버전이 같은지 먼저 확인하고, 다르면
+아무것도 하기 전에 멈춥니다. 어긋난 채로 나가면 나중에 어느 쪽이 맞는지 알
+수 없고, 마켓플레이스는 같은 버전을 두 번 받지 않아 되돌릴 수도 없습니다.
+
+게시에 쓰는 토큰은 파이프라인의 비밀 변수 `VSCE_PAT` 입니다. Marketplace
+(Manage) 범위의 PAT 하나면 되고, 로그에는 찍히지 않습니다.
 
 ## 개발
 
