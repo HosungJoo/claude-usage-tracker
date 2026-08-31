@@ -27,7 +27,8 @@
     "vscode:dev": "npm run vscode:build && code --extensionDevelopmentPath=$PWD/apps/vscode --new-window .",
     "vscode:demo": "npm run vscode:build && rm -f \"${XDG_CONFIG_HOME:-$HOME/.config}\"/claude-usage-tracker/vscode-state.json && CUT_DEV_REVEAL=1 CUT_DEV_THRESHOLDS=1 CUT_DEV_HOLD_MS=45000 code --user-data-dir=.vscode-demo-profile --extensions-dir=\"$HOME/.vscode/extensions\" --extensionDevelopmentPath=$PWD/apps/vscode --new-window .",
     "vscode:icon": "tsx tools/make-vscode-icon.ts",
-    "vscode:package": "npm run vscode:build && npm run vscode:icon && cd apps/vscode && vsce package --allow-missing-repository --skip-license"
+    "vscode:package": "npm run vscode:build && npm run vscode:icon && cd apps/vscode && vsce package",
+    "vscode:publish": "npm run vscode:build && npm run vscode:icon && cd apps/vscode && vsce publish"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
