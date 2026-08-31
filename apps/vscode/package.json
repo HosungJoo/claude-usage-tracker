@@ -2,7 +2,7 @@
   "name": "claude-usage-tracker-vscode",
   "displayName": "Claude Usage Tracker for Claude Code",
   "description": "Claude Code 패널 머리줄에 사용량을 띄운다",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "hosungjoo",
   "license": "MIT",
   "engines": {
