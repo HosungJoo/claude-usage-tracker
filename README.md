@@ -406,6 +406,20 @@ AppImage 하나로 냅니다. deb/rpm처럼 시스템에 자리를 잡는 대신
 npm run package    # build → icons → electron-builder → release/*.AppImage
 ```
 
+**크기** — 받는 파일은 약 70MiB입니다. 대부분이 Electron이고 우리 코드는
+asar 131KB입니다. 빈 Electron 앱을 같은 설정으로 빌드하면 72.8MiB가 나오므로,
+사실상 하한에서 더 깎아낸 상태입니다.
+
+| 한 일 | 효과 |
+|---|---|
+| `electronLanguages: [ko, en-US]` | 로케일 55개 → 2개, 40MB → 1MB |
+| `compression: maximum` | squashfs 압축 강화 |
+| `afterPack: tools/trim-runtime.cjs` | 안 쓰는 런타임 부품 9.2MB 제거 |
+
+합쳐서 108MB → 70MiB. 더 줄이려면 Electron을 벗어나야 하는데(Tauri 등
+시스템 WebView 사용, 3~10MB), 투명·클릭통과·항상위·트레이를 전부 다시
+검증해야 하는 일이라 지금 단계의 일이 아닙니다.
+
 아이콘은 리포에 두지 않고 패키징 직전에 **캐릭터에서 새로 그립니다**
 (`tools/make-icons.ts`). 트레이 아이콘과 같은 이유입니다 — 커밋된 PNG는
 캐릭터가 바뀔 때 동기화를 사람이 기억해야 합니다. 런처에서는 아이콘끼리
