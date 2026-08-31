@@ -344,6 +344,7 @@ src/main/                  Electron 메인
   overlay-window.ts        투명·클릭통과·항상위 창 + 배치 계산
   overlay-host.ts          화면마다 창을 하나씩 관리
   overlay-controller.ts    표시 큐 (겹침 방지, 심각도 우선순위)
+  capture-window.ts        문서용 스크린샷 전용 오프스크린 창
   event-spool.ts           훅 이벤트 수신 (파일 드롭 + watch/스윕)
   session-greeter.ts       언제 인사하고 언제 나서지 않을지
   tray.ts                  트레이 아이콘 + 메뉴

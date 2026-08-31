@@ -174,6 +174,14 @@ export class WindowOverlayHost implements OverlayHost {
     }
     return null;
   }
+
+  /**
+   * 살아 있는 창 전부. 캡처가 임시 배경을 깔 때 쓴다 — 한 창에만 깔면
+   * 한쪽 모니터는 검은 배경, 다른 쪽은 투명 캐릭터로 갈린다.
+   */
+  allWindows(): BrowserWindow[] {
+    return [...this.windows.values()].filter((w) => !w.isDestroyed());
+  }
 }
 
 /**

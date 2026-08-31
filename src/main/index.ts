@@ -22,6 +22,7 @@ import { applyAutostart } from './autostart.js';
 import { findWorkingWindow } from './window-anchor.js';
 import { overlaySizeFor, type OverlayPlacement } from './overlay-window.js';
 import { resolveTargets, WindowOverlayHost } from './overlay-host.js';
+import { captureScene, openCaptureWindow } from './capture-window.js';
 import type { Severity, UsageResponse, UsageSnapshot } from '../core/types.js';
 import type { Settings } from '../shared/settings.js';
 
@@ -402,29 +403,35 @@ async function captureDemo(dir: string): Promise<void> {
   const { writeFile, mkdir } = await import('node:fs/promises');
   await mkdir(dir, { recursive: true });
 
-  // capturePage는 투명 창을 통째로 투명하게 캡처한다. 배치와 색을 눈으로
-  // 확인하려면 임시 배경이 필요하다 — 캡처 모드에서만 깔고, 실제 실행에는
-  // 영향을 주지 않는다.
-  const shot = host?.anyWindow() ?? null;
-  await shot?.webContents.insertCSS('body { background: #1e1e1e !important; }');
+  // 살아 있는 오버레이가 아니라 전용 창에서 찍는다. 캡처에 필요한 배경을
+  // 오버레이에 주입하면 그게 사용자 화면에 그대로 뜬다.
+  const st = store.value;
+  const size = overlaySizeFor(st.anchor);
+  const shot = await openCaptureWindow({
+    preloadPath: join(__dirname, '../preload/index.cjs'),
+    size,
+    ...rendererTarget(),
+  });
 
   for (const scene of demoScenes()) {
-    controller?.clear();
-    await new Promise((r) => setTimeout(r, 120));
-    const st = store.value;
-    controller?.enqueue(
-      scene.line, scene.severity, scene.gauges,
-      st.corner, overlaySizeFor(st.anchor), st.anchor === 'center',
-    );
-    await new Promise((r) => setTimeout(r, 1400));
+    const png = await captureScene(shot, {
+      id: 0,
+      line: scene.line,
+      severity: scene.severity,
+      gauges: scene.gauges,
+      corner: st.corner,
+      size,
+      centered: st.anchor === 'center',
+    });
+    if (!png) break;
 
-    if (!shot || shot.isDestroyed()) break;
-    const image = await shot.webContents.capturePage();
     // 파일명에 순번을 붙이지 않는다 — README가 이 이름을 그대로 걸고
     // 있어서, 장면이 하나 늘면 번호가 밀려 링크가 어긋난다.
-    await writeFile(join(dir, `${scene.name}.png`), image.toPNG());
+    await writeFile(join(dir, `${scene.name}.png`), png);
     console.log(`captured ${scene.name}.png`);
   }
+
+  if (!shot.isDestroyed()) shot.destroy();
   app.quit();
 }
 
@@ -432,8 +439,16 @@ async function captureDemo(dir: string): Promise<void> {
 async function captureHookFlow(dir: string): Promise<void> {
   const { writeFile, mkdir } = await import('node:fs/promises');
   await mkdir(dir, { recursive: true });
+
+  // 이쪽은 데모와 달리 살아 있는 오버레이를 찍어야 한다 — 훅이 실제로
+  // 캐릭터를 띄우는지 확인하는 모드라, 전용 창으로 대신하면 확인할 것을
+  // 확인하지 못한다. 대신 배경은 모든 창에 깐다. 한 창에만 깔면 모니터마다
+  // 다르게 보인다.
+  for (const win of host?.allWindows() ?? []) {
+    await win.webContents.insertCSS('body { background: #1e1e1e !important; }');
+  }
+  console.log('hook-capture: 확인용 배경을 깔았습니다 — 화면에 어둡게 보입니다');
   const shot = host?.anyWindow() ?? null;
-  await shot?.webContents.insertCSS('body { background: #1e1e1e !important; }');
   console.log(`hook-capture ready: ${spool?.directory ?? '(스풀 없음)'}`);
 
   for (let i = 0; i < 40; i++) {
